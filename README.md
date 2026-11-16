@@ -1,5 +1,7 @@
 # 🎯 미니 배틀그라운드 (Mini Battlegrounds)
 
+**▶ 플레이: https://minibattlegrounds.onrender.com** (무료 서버라 오래 비어 있었으면 첫 접속 때 1분 정도 기다려야 함)
+
 Escape from Duckov 느낌의 탑다운 웹 배틀로얄 + 타르코프식 탈출 모드입니다. 모바일(터치 조이스틱)과 PC(키보드·마우스)에서 같이 플레이할 수 있습니다.
 
 ## 실행 (로컬)
