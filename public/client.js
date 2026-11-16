@@ -50,7 +50,7 @@ function onMsg(m) {
     case 'err': if (m.code === 'pw') return askPw(m.id, m.txt); toast(m.txt); break;
     case 'msg': toast(m.txt); break;
     case 'nametaken': myName = m.name; toast(m.txt); break;
-    case 'acct': acct = m.acc; if (m.token) setTok(m.token); if (acct.skin) { save.sel = S.cleanSkin(acct.skin); } closeModal('authm'); updStats(); if ($('stashm').classList.contains('on')) renderStash(); break;
+    case 'acct': if ($('raidm').classList.contains('on')) setTimeout(renderRaid, 0); acct = m.acc; if (m.token) setTok(m.token); if (acct.skin) { save.sel = S.cleanSkin(acct.skin); } closeModal('authm'); updStats(); if ($('stashm').classList.contains('on')) renderStash(); break;
     case 'autherr': { const e = $('aErr'); e.textContent = m.txt; $('authBox').classList.remove('shake'); void $('authBox').offsetWidth; $('authBox').classList.add('shake'); break; }
     case 'logout': acct = null; setTok(null); updStats(); closeModal('stashm'); if (m.txt) toast(m.txt); hello(); break;
     case 'start': startGame(m); break;
@@ -71,19 +71,42 @@ $('qEX').onclick = () => { renderRaid(); $('raidm').classList.add('on'); };
 const DGCOL = ['', '#cddc39', '#4fc3f7', '#b39ddb', '#ffb74d', '#ef5350'];
 let worldInfo = null;
 function fmtUp(sec) { const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60; return h ? `${h}시간 ${m}분` : `${m}분`; }
+const STACKK = { am: 1, med: 1, band: 1, gren: 1, flash: 1, smoke: 1, fuel: 1 };
+function ldRow(it, i, side) {
+  const st = STACKK[it.k], step = it.k === 'am' ? (it.d === 'sniper' ? 5 : it.d === 'shell' ? 10 : 30) : 1;
+  const nm = esc(S.itemName(it)) + (st ? ` <i>×${it.n}</i>` : '');
+  const sub = it.k === 'w' ? itemSub(it) : it.k === 'ar' ? `내구도 ${Math.round(it.n)}` : it.k === 'att' ? (S.ATT[it.d] ? S.ATT[it.d].d : '') : '';
+  const btns = side === 'kit'
+    ? (st && it.n > step ? `<button class="g" data-ld="unkit:${i}:${step}">-${step}</button>` : '') + `<button class="g" data-ld="unkit:${i}:0">빼기</button>`
+    : (st && it.n > step ? `<button class="b" data-ld="kit:${i}:${step}">+${step}</button>` : '') + `<button class="y" data-ld="kit:${i}:0">${st ? '전부' : '챙기기'}</button>`;
+  return `<div class="ldr" style="--c:${ICOL[it.k] || '#3a444e'}"><div style="min-width:0"><b>${nm}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div><div class="ldb">${btns}</div></div>`;
+}
 function renderRaid() {
   const w = worldInfo, box = $('raidBox'); if (!box) return;
-  const kitN = acct ? acct.kit.length : 0, kitV = acct ? acct.kit.reduce((a, it) => a + S.itemPrice(it), 0) : 0;
-  box.innerHTML = `<div class="row" style="justify-content:space-between"><div class="rlive">LIVE · 상시 운영 중</div><button class="g" id="raidX" style="padding:6px 12px">닫기</button></div>
-   <div class="rbig"><b>${w ? w.n : '-'}</b><span>명이 지금 레이드 중</span></div>
-   <div style="font-size:12px;color:var(--tx3)">${w ? `서버 가동 ${fmtUp(w.up)} · 입장 지점 16곳 · 고정 탈출구 5곳${w.drops ? ` · 보급 ${w.drops}개 투하됨` : ''}` : '현황을 불러오는 중'}</div>
-   <div class="dgl">${w ? w.dg.map(d => `<div class="dgr" style="--c:${DGCOL[d.tier]}"><div><b>${esc(d.name)}</b><small>위험도 ${'■'.repeat(d.tier)}${'□'.repeat(5 - d.tier)}</small></div><span class="gn">경비 ${d.g}</span><span class="pn">${d.n}<i>명</i></span></div>`).join('') + `<div class="dgr" style="--c:#5c656d"><div><b>던전 밖 (야외·오두막)</b><small>입장 지점과 포탈 주변은 몬스터가 오지 않는 안전지대</small></div><span class="gn"></span><span class="pn">${w.out}<i>명</i></span></div>` : ''}</div>
-   <div class="rkit">${acct ? (kitN ? `<b style="color:var(--tx)">들고 갈 장비</b> · ${kitV.toLocaleString()}원 상당 · 죽으면 모두 잃습니다<br>${acct.kit.map(it => esc(S.itemName(it)) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')).join(', ')}` : '들고 갈 장비가 없습니다. 기본 지급: 무한 탄약 권총 + 붕대') + ' <a href="#" id="raidKit" style="color:var(--acc)">장비 바꾸기</a>' : '손님은 기본 권총(무한 탄약)으로 들어가고, 탈출해도 장비가 남지 않습니다. <a href="#" id="raidLogin" style="color:var(--acc)">로그인</a>'}</div>
-   <button class="y" id="raidGo" style="width:100%;padding:14px;font-size:15px">지금 바로 입장</button>`;
+  const head = `<div class="row" style="justify-content:space-between"><div class="rlive">LIVE · 상시 운영 중</div><button class="g" id="raidX" style="padding:6px 12px">닫기</button></div>
+   <div class="rbig"><b>${w ? w.n : '-'}</b><span>명이 지금 레이드 중${w ? ` · 서버 가동 ${fmtUp(w.up)}` : ''}</span></div>
+   <div class="dgs">${w ? w.dg.map(d => `<span style="--c:${DGCOL[d.tier]}">${esc(d.name)} <b>${d.n}</b>명 · 경비 ${d.g}</span>`).join('') + `<span style="--c:#5c656d">던전 밖 <b>${w.out}</b>명</span>` : ''}</div>`;
+  let body;
+  if (!acct) body = `<div class="rkit">손님은 무한 탄약 권총과 붕대 1개로 들어가고, 탈출해도 장비가 남지 않습니다.<br><a href="#" id="raidLogin" style="color:var(--acc)">로그인하면</a> 창고에서 총·구급상자·붕대·탄약을 골라 챙겨 갈 수 있습니다.</div>`;
+  else {
+    const kitW = acct.kit.filter(x => x.k === 'w').length, kitA = acct.kit.filter(x => x.k === 'ar').length, kitV = acct.kit.reduce((a, it) => a + S.itemPrice(it), 0);
+    const avail = acct.stash.map((it, i) => [it, i]).filter(([it]) => it.k !== 'val');
+    const order = { w: 0, ar: 1, med: 2, band: 3, am: 4, gren: 5, flash: 6, smoke: 7, att: 8, fuel: 9 };
+    avail.sort((a, b) => (order[a[0].k] ?? 9) - (order[b[0].k] ?? 9));
+    body = `<div class="ldgrid">
+      <div class="ldcol"><div class="lbl" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>가져갈 장비</span><span>${kitV.toLocaleString()}원</span></div>
+        ${acct.kit.map((it, i) => ldRow(it, i, 'kit')).join('') || '<div class="empty" style="padding:16px 6px">아직 고른 장비가 없습니다.<br>안 고르면 무한 탄약 권총으로 들어갑니다.</div>'}
+        <div class="ldnote">무기 ${kitW}/2 · 방어구 ${kitA}/1 · 죽으면 가져간 장비를 모두 잃습니다</div></div>
+      <div class="ldcol"><div class="lbl" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>창고</span><a href="#" id="raidShop" style="color:var(--acc);letter-spacing:0;text-transform:none">상인에서 사기</a></div>
+        ${avail.map(([it, i]) => ldRow(it, i, 'stash')).join('') || '<div class="empty" style="padding:16px 6px">창고가 비었습니다</div>'}</div>
+    </div>`;
+  }
+  box.innerHTML = head + body + `<button class="y" id="raidGo" style="width:100%;padding:14px;font-size:15px;margin-top:10px">이대로 입장</button>`;
   $('raidX').onclick = () => closeModal('raidm');
   $('raidGo').onclick = () => { closeModal('raidm'); hello(); sendM({ t: 'quick', mode: 'ex' }); };
-  const k = $('raidKit'); if (k) k.onclick = e => { e.preventDefault(); closeModal('raidm'); openStash(); };
   const l = $('raidLogin'); if (l) l.onclick = e => { e.preventDefault(); closeModal('raidm'); openAuth('login'); };
+  const sh = $('raidShop'); if (sh) sh.onclick = e => { e.preventDefault(); stTab = 'shop'; closeModal('raidm'); openStash(); };
+  box.querySelectorAll('[data-ld]').forEach(b => b.onclick = () => { const [op, i, n] = b.dataset.ld.split(':'); sendM({ t: 'stash', op, i: +i, n: +n }); });
 }
 $('mk').onclick = () => { hello(); sendM({ t: 'create', name: $('rname').value.trim() || ((acct ? acct.name : save.name) + '의 방'), ts: radio('rts'), pw: $('rpw').value }); };
 $('startBtn').onclick = () => sendM({ t: 'start' });

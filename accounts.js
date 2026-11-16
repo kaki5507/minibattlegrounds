@@ -89,14 +89,19 @@ function addToStash(a, it) {
   a.stash.push(it); return true;
 }
 function kitCount(a, k) { return a.kit.filter(x => x.k === k).length; }
-function moveToKit(a, i) {
+// n: 묶음 아이템(탄약·구급상자 등)에서 일부만 옮길 개수. 없으면 전부
+function takePart(list, i, n) {
+  const it = list[i]; if (!it) return null;
+  if (STACK[it.k] && n > 0 && n < it.n) { it.n -= n; return Object.assign({}, it, { n }); }
+  list.splice(i, 1); return it;
+}
+function mergeInto(list, it) { if (STACK[it.k]) { const s = list.find(x => x.k === it.k && (it.k !== 'am' || x.d === it.d)); if (s) { s.n += it.n; return; } } list.push(it); }
+function moveToKit(a, i, n) {
   const it = a.stash[i]; if (!it) return '아이템이 없습니다';
   if (it.k === 'w' && kitCount(a, 'w') >= 2) return '무기는 2개까지 가져갈 수 있습니다';
   if (it.k === 'ar' && kitCount(a, 'ar') >= 1) return '방어구는 1개만 가져갈 수 있습니다';
   if (it.k === 'val') return '귀중품은 레이드에 가져갈 수 없습니다 (판매하세요)';
-  a.stash.splice(i, 1);
-  if (STACK[it.k]) { const s = a.kit.find(x => x.k === it.k && (it.k !== 'am' || x.d === it.d)); if (s) { s.n += it.n; persist(a); return null; } }
-  a.kit.push(it); persist(a); return null;
+  mergeInto(a.kit, takePart(a.stash, i, n)); persist(a); return null;
 }
 // 탈출 후 장비 유지: 무기 2·방어구 1·탄약·소모품·부착물은 장착(반입) 상태로, 넘치는 건 창고로
 function equipFromRaid(a, items) {
@@ -114,7 +119,7 @@ function equipFromRaid(a, items) {
   }
   persist(a); return { kept, stored };
 }
-function moveToStash(a, i) { const it = a.kit[i]; if (!it) return '아이템이 없습니다'; a.kit.splice(i, 1); addToStash(a, it); persist(a); return null; }
+function moveToStash(a, i, n) { if (!a.kit[i]) return '아이템이 없습니다'; const it = takePart(a.kit, i, n); if (STACK[it.k]) mergeInto(a.stash, it); else addToStash(a, it); persist(a); return null; }
 function sell(a, i, from) {
   const list = from === 'kit' ? a.kit : a.stash, it = list[i]; if (!it) return '아이템이 없습니다';
   list.splice(i, 1); a.money += Math.floor(S.itemPrice(it) * .5); persist(a); return null;

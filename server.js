@@ -179,7 +179,7 @@ class Room {
     const e = this.mkEnt(c.name, false, 100000 + c.id, c.skin); e.cid = c.id; c.eid = e.id;
     if (c.acc) {
       e.acc = c.acc; const kit = c.acc.kit; c.acc.kit = []; ACC.persist(c.acc);
-      if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.w[0].free = 1; } for (const w of e.w) if (w && w.mag < w.st.mag) { if (INF(w)) { w.mag = w.st.mag; continue; } const t = Math.min(w.st.mag - w.mag, e.am[w.st.am] || 0); w.mag += t; e.am[w.st.am] -= t; } }
+      if (kit.length) { e.w = [null, null]; e.am.light = 0; for (const k in e.it) e.it[k] = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.w[0].free = 1; } else if (!e.w[1]) { e.w[1] = newW('pistol'); e.w[1].free = 1; } for (const w of e.w) if (w && w.mag < w.st.mag) { if (INF(w)) { w.mag = w.st.mag; continue; } const t = Math.min(w.st.mag - w.mag, e.am[w.st.am] || 0); w.mag += t; e.am[w.st.am] -= t; } }
       e.kitVal = kit.reduce((s, it) => s + S.itemPrice(it), 0);
     }
     // 다른 사람과 먼 입장 포탈
@@ -923,8 +923,8 @@ wss.on('connection', ws => {
         const inRaid = r && r.st === 'play' && (!r.world || (r.byId(c.eid) && r.alive(r.byId(c.eid))));
         if (inRaid) { send(c, JSON.stringify({ t: 'err', txt: '게임 중에는 창고를 정리할 수 없습니다' })); break; }
         let err = null;
-        if (m.op === 'kit') err = ACC.moveToKit(c.acc, +m.i);
-        else if (m.op === 'unkit') err = ACC.moveToStash(c.acc, +m.i);
+        if (m.op === 'kit') err = ACC.moveToKit(c.acc, +m.i, Math.max(0, Math.floor(+m.n || 0)));
+        else if (m.op === 'unkit') err = ACC.moveToStash(c.acc, +m.i, Math.max(0, Math.floor(+m.n || 0)));
         else if (m.op === 'sell') err = ACC.sell(c.acc, +m.i, m.from);
         else if (m.op === 'buy') err = ACC.buy(c.acc, String(m.id));
         if (err) send(c, JSON.stringify({ t: 'err', txt: err }));
