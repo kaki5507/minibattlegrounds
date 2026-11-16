@@ -532,7 +532,7 @@ function handleEv(ev, now) {
     case 'kill': G.feed.push({ a: ev.a, b: ev.b, w: ev.w, down: ev.down, until: now + 6000, mine: ev.a === nameOf(me.id), me: ev.b === nameOf(me.id) }); if (G.feed.length > 6) G.feed.shift(); break;
     case 'msg': G.msgs.push({ t: ev.txt, until: now + 4500 }); break;
     case 'drop': break;
-    case 'shot': { const so = G.others.get(ev.id); if (so) so.kickT = now; if (!so) G.sounds.push({ x: ev.x, y: ev.y, until: now + 1300, sil: ev.sil }); sfx(ev.sil ? 'sil' : ev.w === 'sniper' ? 'sniper' : 'shot', 1 - dist / 1400); break; }
+    case 'shot': { const so = G.others.get(ev.id); if (so) so.kickT = now; if (!so) { const old = G.sounds.find(q => hyp(q.x - ev.x, q.y - ev.y) < 160); if (old) { old.until = now + 2200; old.t0 = now; old.n++; } else G.sounds.push({ x: ev.x, y: ev.y, until: now + 2200, t0: now, sil: ev.sil, n: 1 }); } sfx(ev.sil ? 'sil' : ev.w === 'sniper' ? 'sniper' : 'shot', 1 - dist / 2000); break; }
     case 'hit': G.hits.push({ until: now + 450, d: ev.d, x: ev.x, y: ev.y, k: ev.k }); G.hitMark = now; break;
     case 'hurt': G.hurts.push({ x: ev.x, y: ev.y, until: now + 900 }); if (navigator.vibrate) navigator.vibrate(25); break;
     case 'boom': G.booms.push({ x: ev.x, y: ev.y, r: ev.r, t0: now, f: ev.f }); sfx('boom', 1 - dist / 1500); break;
@@ -739,10 +739,12 @@ function drawMapOverlay(x, k, s, big) {
   if (z) {
     x.strokeStyle = '#fff'; x.lineWidth = 2 * D; x.setLineDash([6, 4]); x.beginPath(); x.arc(z[3] * k, z[4] * k, Math.max(1, z[5] * k), 0, 6.283); x.stroke(); x.setLineDash([]);
     x.strokeStyle = '#4fa3e0'; x.beginPath(); x.arc(z[0] * k, z[1] * k, Math.max(1, z[2] * k), 0, 6.283); x.stroke();
+    const mp = G.local && G.me && G.me.st === 'a' ? G.local : G.me ? { x: G.me.vx, y: G.me.vy } : null; if (mp && hyp(mp.x - z[3], mp.y - z[4]) > z[5]) { x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 1.5 * D; x.setLineDash([4 * D, 4 * D]); x.beginPath(); x.moveTo(mp.x * k, mp.y * k); x.lineTo(z[3] * k, z[4] * k); x.stroke(); x.setLineDash([]); }
   }
   x.font = `700 ${Math.round(11 * D)}px 'Noto Sans KR',sans-serif`; x.textAlign = 'center';
   if (G.exts) for (const e of G.exts) { x.fillStyle = e.risky ? '#ff8a65' : '#5ee08a'; x.beginPath(); x.arc(e.x * k, e.y * k, big ? 7 * D : 4, 0, 6.283); x.fill(); if (big) { x.fillStyle = '#000a'; x.fillText(e.name, e.x * k + 1, e.y * k + 21 * D); x.fillStyle = '#d6ffe2'; x.fillText(e.name, e.x * k, e.y * k + 20 * D); } }
   for (const d of G.drops) if (!d[4]) { x.fillStyle = '#ff4d4d'; x.fillRect(d[1] * k - 4, d[2] * k - 4, 8, 8); if (big) { x.fillStyle = '#fff'; x.fillText('보급' + (d[3] > 0 ? ` ${d[3]}초` : ''), d[1] * k, d[2] * k - 9); } }
+  const nowp = performance.now(); for (const s of G.sounds) { const p = (nowp - s.t0) % 900 / 900; x.strokeStyle = s.sil ? 'rgba(180,190,200,.8)' : `rgba(255,170,60,${1 - p})`; x.lineWidth = 2 * D; x.beginPath(); x.arc(s.x * k, s.y * k, (big ? 6 : 3) * D + p * (big ? 14 : 8) * D, 0, 6.283); x.stroke(); x.fillStyle = 'rgba(255,170,60,.9)'; x.beginPath(); x.arc(s.x * k, s.y * k, (big ? 3 : 2) * D, 0, 6.283); x.fill(); }
   for (const o of G.others.values()) if (o.fl & 16) { x.fillStyle = '#4fc3f7'; x.beginPath(); x.arc(o.x * k, o.y * k, big ? 5 * D : 3, 0, 6.283); x.fill(); }
   const me = G.me; if (me) { const px = (G.local && me.st === 'a' ? G.local.x : me.vx) * k, py = (G.local && me.st === 'a' ? G.local.y : me.vy) * k; x.fillStyle = '#ffd54f'; x.beginPath(); x.arc(px, py, big ? 6 * D : 3.5, 0, 6.283); x.fill(); x.strokeStyle = '#ffd54f'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(lastAim) * 12, py + Math.sin(lastAim) * 12); x.stroke(); }
 }
@@ -829,7 +831,7 @@ function frame(now) {
   // 탈출구
   if (G.exts) for (const e of G.exts) if (inV(e.x, e.y, 140)) { const p = .5 + Math.sin(now / 400) * .5; ctx.fillStyle = e.risky ? 'rgba(255,138,101,.18)' : 'rgba(94,224,138,.18)'; ctx.strokeStyle = e.risky ? '#ff8a65' : '#5ee08a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.globalAlpha = .4 * p; ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 14 * p, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.font = `700 17px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('EXTRACT', e.x, e.y - 4); ctx.font = `500 13px ${FONT}`; ctx.fillText(e.name, e.x, e.y + 16); }
   // 입장 포탈 (월드)
-  for (const p of M.entries || []) if (vf === 0 && inV(p.x, p.y, 60)) { ctx.strokeStyle = 'rgba(226,160,63,.6)'; ctx.lineWidth = 3; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.arc(p.x, p.y, 46, now / 900, now / 900 + 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(226,160,63,.8)'; ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('입장 지점', p.x, p.y - 54); }
+  for (const p of M.entries || []) if (vf === 0 && inV(p.x, p.y, 60)) { ctx.fillStyle = 'rgba(226,160,63,.10)'; ctx.beginPath(); ctx.arc(p.x, p.y, 40, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(226,160,63,.55)'; ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('입장 지점 · 안전지대', p.x, p.y + 58); }
   // 순간이동 포탈
   for (const p of M.portals) if (p.kind === 'tp' && vf === 0 && inV(p.x, p.y, 50)) { const t = now / 400; ctx.strokeStyle = '#b388ff'; ctx.lineWidth = 5; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(p.x, p.y, p.r - i * 9, t + i, t + i + 4); ctx.stroke(); } ctx.fillStyle = 'rgba(179,136,255,.22)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.fillStyle = '#e6dcff'; ctx.font = `700 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(p.to ? '→ ' + p.to : '포탈', p.x, p.y - p.r - 8); }
   // 건물 바닥
@@ -951,7 +953,28 @@ function drawHUD(now, vx, vy, sc, camx, camy) {
   G.hurts = G.hurts.filter(h => h.until > now);
   for (const h of G.hurts) { const a = Math.atan2(h.y - vy, h.x - vx), p = (h.until - now) / 900; ctx.strokeStyle = `rgba(255,60,40,${p})`; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(G.screenMe.x, G.screenMe.y, 72, a - .32, a + .32); ctx.stroke(); }
   G.sounds = G.sounds.filter(s => s.until > now);
-  for (const s of G.sounds) { const a = Math.atan2(s.y - vy, s.x - vx), p = (s.until - now) / 1300; const rx = G.screenMe.x + Math.cos(a) * 100, ry = G.screenMe.y + Math.sin(a) * 100; ctx.save(); ctx.translate(rx, ry); ctx.rotate(a); ctx.fillStyle = s.sil ? `rgba(180,190,200,${p * .7})` : `rgba(255,200,80,${p})`; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.fill(); ctx.restore(); }
+  for (const s of G.sounds) {
+    const a = Math.atan2(s.y - vy, s.x - vx), p = Math.min(1, (s.until - now) / 1500), dist = hyp(s.x - vx, s.y - vy), fresh = Math.max(0, 1 - (now - s.t0) / 400);
+    const col = s.sil ? '180,190,200' : '255,170,60';
+    // 캐릭터 주변 방향 호
+    ctx.strokeStyle = `rgba(${col},${p * .9})`; ctx.lineWidth = 5 + fresh * 4; ctx.beginPath(); ctx.arc(G.screenMe.x, G.screenMe.y, 118, a - .22, a + .22); ctx.stroke();
+    // 화면 가장자리 표시 + 거리
+    const R = Math.min(W, H) * .4, ex = W / 2 + Math.cos(a) * Math.min(R * 1.25, W / 2 - 60), ey = Math.max(96 + SAFE.t, Math.min(H - 150, H / 2 + Math.sin(a) * Math.min(R, H / 2 - 50)));
+    ctx.save(); ctx.translate(ex, ey); ctx.globalAlpha = p;
+    ctx.fillStyle = `rgba(${col},.95)`; ctx.beginPath(); ctx.arc(0, 0, 13 + fresh * 6, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#14100a'; ctx.font = `900 13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(s.sil ? '·' : '!', 0, 5);
+    ctx.fillStyle = '#fff'; ctx.font = `700 11px ${FONT}`; ctx.fillText(`${s.sil ? '소음 총성' : '총성'} ${Math.round(dist / 10)}m${s.n > 3 ? ' · 교전 중' : ''}`, 0, 28);
+    ctx.restore();
+  }
+  // 자기장 방향 표시
+  if (G.z && (me.st === 'a' || me.st === 'd')) {
+    const z = G.z, edgeArrow = (a, label, col, sub) => { const R = Math.min(W, H) * .4, x = W / 2 + Math.cos(a) * Math.min(R * 1.25, W / 2 - 70), y = Math.max(96 + SAFE.t, Math.min(H - 150, H / 2 + Math.sin(a) * Math.min(R, H / 2 - 60))); ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -11); ctx.lineTo(-3, 0); ctx.lineTo(-8, 11); ctx.fill(); ctx.restore(); ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center'; const w = ctx.measureText(label).width + 14; pill(x - w / 2, y + 16, w, 18, 'rgba(10,12,14,.78)', col); ctx.fillStyle = '#fff'; ctx.fillText(label, x, y + 29); if (sub) { ctx.font = `600 10px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText(sub, x, y + 45); } };
+    const dSafe = hyp(vx - z[3], vy - z[4]) - z[5];
+    if (dSafe > 0) edgeArrow(Math.atan2(z[4] - vy, z[3] - vx), `안전구역 ${Math.round(dSafe / 10)}m`, '#e6e9ec', z[7] === 'shrink' ? '자기장 축소 중' : z[7] === 'wait' ? `${z[8]}초 후 축소` : '');
+    const dc = hyp(vx - z[0], vy - z[1]), dWall = z[2] - dc;
+    if (dWall > 0 && (dWall < 700 || z[7] === 'shrink')) edgeArrow(Math.atan2(vy - z[1], vx - z[0]), `자기장 ${Math.round(dWall / 10)}m`, '#4fa3e0', z[7] === 'shrink' ? '이쪽에서 다가오는 중' : '');
+  }
+
   // 히트마커
   if (now - G.hitMark < 160) { const m = G.screenMe, ax = m.x + Math.cos(lastAim) * 60, ay = m.y + Math.sin(lastAim) * 60; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.moveTo(ax + dx * 4, ay + dy * 4); ctx.lineTo(ax + dx * 10, ay + dy * 10); } ctx.stroke(); }
   for (const d of G.drops) if (!d[4]) { const dx = d[1] - vx, dy = d[2] - vy, dist = hyp(dx, dy); if (dist < 320) continue; const a = Math.atan2(dy, dx), R = Math.min(W, H) * .42; const x = W / 2 + Math.cos(a) * R, y = H / 2 + Math.sin(a) * R; ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = '#ff4d4d'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.fill(); ctx.restore(); ctx.fillStyle = '#fff'; ctx.font = `700 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(`보급 ${Math.round(dist / 10)}m${d[3] > 0 ? ' · ' + d[3] + 's' : ''}`, x, y + 22); }
@@ -1019,8 +1042,9 @@ function drawHUD(now, vx, vy, sc, camx, camy) {
   // 조이스틱
   if (isTouch) {
     for (const [s, dx, dy, lbl] of [[sticks.move, 116, H - 116, '이동'], [sticks.aim, W * .6, H * .52, '']]) {
-      if (!s && !lbl) { ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(dx, dy, STICK_R, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = `600 11px ${FONT}`; ctx.fillText('오른쪽 화면 드래그로 조준', dx, dy + 4); continue; }
+      if (!s && !lbl) continue;
       const ox = s ? s.ox : dx, oy = s ? s.oy : dy, kx = s ? s.x : dx, ky = s ? s.y : dy;
+      if (s && s === sticks.aim) { ctx.strokeStyle = 'rgba(226,160,63,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox, oy, STICK_R, 0, 6.283); ctx.stroke(); ctx.fillStyle = 'rgba(226,160,63,.55)'; ctx.beginPath(); ctx.arc(kx, ky, 14, 0, 6.283); ctx.fill(); continue; }
       ctx.fillStyle = 'rgba(10,12,14,.32)'; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(ox, oy, STICK_R, 0, 6.283); ctx.fill(); ctx.stroke();
       ctx.fillStyle = s ? 'rgba(226,160,63,.75)' : 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(kx, ky, 22, 0, 6.283); ctx.fill();

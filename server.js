@@ -75,12 +75,15 @@ let nextRoomId = 1;
 const rooms = new Map(), clients = new Map();
 const ZPH = [[90, 60, 3600], [70, 45, 2300], [55, 40, 1400], [45, 30, 800], [35, 25, 400], [25, 20, 150], [20, 25, 0]];
 const ZDPS = [0.6, 1.2, 2.2, 4, 7, 11, 16, 22];
-const GUARD = [null,
-  { n: '공장 경비', hp: 80, w: ['pistol', 'smg', 'pistol'], ar: 0, err: .17, val: [40, 160] },
-  { n: '항구 깡패', hp: 90, w: ['smg', 'sg'], ar: 1, err: .15, val: [80, 260] },
-  { n: '벙커 병사', hp: 100, w: ['ar', 'sg', 'smg'], ar: 2, err: .13, val: [120, 380] },
-  { n: '기지 특수병', hp: 110, w: ['ar', 'dmr'], ar: 2, err: .11, val: [180, 520] },
-  { n: '연구소 경비', hp: 125, w: ['lmg', 'dmr', 'ar', 'sniper'], ar: 3, err: .09, val: [260, 800] }];
+// 레이드 몬스터 (tier 0: 입장 지점 근처의 약한 떠돌이). dm = 피해 배율
+const GUARD = [
+  { n: '떠돌이', hp: 55, w: ['pistol'], ar: 0, err: .3, val: [10, 70], dm: .45 },
+  { n: '공장 경비', hp: 75, w: ['pistol', 'smg', 'pistol'], ar: 0, err: .25, val: [40, 160], dm: .55 },
+  { n: '항구 깡패', hp: 85, w: ['smg', 'sg'], ar: 1, err: .22, val: [80, 260], dm: .6 },
+  { n: '벙커 병사', hp: 95, w: ['ar', 'sg', 'smg'], ar: 2, err: .2, val: [120, 380], dm: .65 },
+  { n: '기지 특수병', hp: 105, w: ['ar', 'dmr'], ar: 2, err: .18, val: [180, 520], dm: .7 },
+  { n: '연구소 경비', hp: 120, w: ['lmg', 'dmr', 'ar', 'sniper'], ar: 3, err: .16, val: [260, 800], dm: .75 }];
+const BOT_DM = .65; // 배그 봇 피해 배율
 
 class Room {
   constructor(opts, host) {
@@ -143,6 +146,13 @@ class Room {
     this.st = 'play'; this.resetState(); this.pre = 0; this.peaceEnd = 0; this.z = null; this.exOpen = true;
     this.exts = this.M.extracts.slice(); this.dropTimes = [300000];
     this.M.spawns.forEach((sp, i) => { const e = this.mkGuard(sp, i === this.M.spawns.findIndex(q => q.tier === 5)); });
+    // 입장 지점 근처 약한 떠돌이 (안전지대 밖, 던전 밖)
+    const M = this.M;
+    for (const en of M.entries) for (let n = 0, tries = 0; n < 2 && tries < 60; tries++) {
+      const a = rand(0, 6.283), d = rand(700, 1300), x = en.x + Math.cos(a) * d, y = en.y + Math.sin(a) * d;
+      if (hyp(x - M.CX, y - M.CY) > M.R - 200 || this.inSafe(x, y, 150) || M.dungeons.some(g => Math.abs(x - g.x) < g.s / 2 + 150 && Math.abs(y - g.y) < g.s / 2 + 150) || !this.freeSpot(x, y, 24)) continue;
+      this.mkGuard({ x, y, tier: 0 }); n++;
+    }
   }
   inSafe(x, y, pad) { const Z = this.M.safe; if (!Z) return false; for (const z of Z) if (Math.hypot(z.x - x, z.y - y) < z.r + (pad || 0)) return true; return false; }
   worldStatus() {
@@ -153,13 +163,13 @@ class Room {
   mkGuard(sp, boss) {
     const g = GUARD[sp.tier];
     const e = this.mkEnt(boss ? '연구소 경비대장' : g.n, true, 9999, S.cleanSkin({ body: pick(['man', 'woman', 'dog', 'bear', 'robot']), hat: sp.tier >= 4 ? 'helmet' : pick(['cap', 'beret', 'beanie', 'none']), col: ['camo', 'black', 'green', 'black', 'white'][sp.tier - 1], face: pick(['mask', 'none', 'gasmask', 'nvg']), glove: 'tactical', bag: 'mil', gskin: 'none' }));
-    e.home = { x: sp.x, y: sp.y }; e.tier = sp.tier; e.boss = !!boss; this.mkAI(e, 'guard'); this.gearGuard(e); return e;
+    e.home = { x: sp.x, y: sp.y }; e.tier = sp.tier; e.boss = !!boss; if (sp.tier === 0) e.skin = S.cleanSkin({ body: pick(['dog', 'bear', 'man', 'cat']), hat: pick(['none', 'cap', 'beanie']), col: pick(['green', 'black', 'orange']) }); this.mkAI(e, 'guard'); this.gearGuard(e); return e;
   }
   gearGuard(e) {
     const g = GUARD[e.tier];
     Object.assign(e, { st: 'a', hp: e.boss ? 320 : g.hp, w: [newW(e.boss ? 'lmg' : pick(g.w)), null], cw: 0, am: { light: 90, rifle: 150, shell: 30, sniper: 20 }, it: { med: e.tier >= 3 ? 1 : 0, band: 1, gren: e.tier >= 3 && Math.random() < .5 ? 1 : 0, flash: 0, fuel: 0, smoke: 0 }, bag: [], val: randi(g.val[0], g.val[1]) * (e.boss ? 4 : 1), arL: e.boss ? 3 : g.ar, arD: (e.boss ? 3 : g.ar) ? S.ARMOR[e.boss ? 3 : g.ar].dur : 0, act: null, finished: false, x: e.home.x, y: e.home.y, f: 0, rlOn: false, rec: 0 });
     if (e.tier >= 4 && Math.random() < .5) { e.w[0].att.scope = 'scope'; restat(e.w[0]); }
-    e.w[0].mag = e.w[0].st.mag; e.ai.err = e.boss ? .07 : g.err; e.ai.tgt = null; e.ai.goal = null;
+    e.w[0].mag = e.w[0].st.mag; e.dm = e.boss ? .85 : g.dm; e.ai.err = e.boss ? .13 : g.err; e.ai.tgt = null; e.ai.goal = null;
   }
   addPlayer(c) {
     if (c.room && c.room !== this.id) leaveRoom(c, true);
@@ -202,7 +212,8 @@ class Room {
     this.ents.push(e); return e;
   }
   mkAI(e, kind) {
-    e.ai = { kind, nt: 0, goal: null, tgt: null, react: 0, fireUntil: 0, pauseUntil: 0, strafe: 1, flip: 0, last: { x: 0, y: 0 }, unstick: 0, ux: 0, uy: 0, err: .11, wait: 0 };
+    if (kind === 'br') e.dm = BOT_DM;
+    e.ai = { kind, nt: 0, goal: null, tgt: null, react: 0, fireUntil: 0, pauseUntil: 0, strafe: 1, flip: 0, last: { x: 0, y: 0 }, unstick: 0, ux: 0, uy: 0, err: .2, wait: 0 };
   }
   freeSpot(x, y, r) { const p = { x, y }; S.resolve(this.M, p, r || S.PR, 0); return hyp(p.x - x, p.y - y) < 1 && !S.inBld(this.M, x, y); }
   randSpot(rmin, rmax, avoid, md) {
@@ -426,7 +437,7 @@ class Room {
     for (let i = 0; i < st.pel; i++) {
       const err = (st.sp * (st.pel > 1 ? Math.max(.7, adm) : adm) + e.rec * adm) * (Math.random() * 2 - 1) * Math.PI / 180;
       const a = e.a + err + e.rb * adm;
-      this.bullets.push({ id: this.nid++, o: e.id, team: e.team, x: e.x + Math.cos(e.a) * 18, y: e.y + Math.sin(e.a) * 18, vx: Math.cos(a) * st.spd, vy: Math.sin(a) * st.spd, f: e.f, dmg: st.dmg, rng: st.rng * (e.ad ? 1.15 : 1), trav: 0, wn: st.n, h: e.bot ? 0 : 1 });
+      this.bullets.push({ id: this.nid++, o: e.id, team: e.team, x: e.x + Math.cos(e.a) * 18, y: e.y + Math.sin(e.a) * 18, vx: Math.cos(a) * st.spd, vy: Math.sin(a) * st.spd, f: e.f, dmg: st.dmg * (e.bot ? (e.dm || BOT_DM) : 1), rng: st.rng * (e.ad ? 1.15 : 1), trav: 0, wn: st.n, h: e.bot ? 0 : 1 });
     }
     e.rec = Math.min(st.rmax, e.rec + st.rc);
     e.rb = Math.max(-.06, Math.min(.06, e.rb + (Math.random() - .45) * st.rc * .004));
@@ -657,11 +668,11 @@ class Room {
       let best = null, bd = 1e9;
       if (!peace) for (const o of this.ents) {
         if (o === e || o.team === e.team || !this.alive(o) || o.f !== e.f || o.car) continue;
-        const d = hyp(o.x - e.x, o.y - e.y); if (d > (guard ? 560 : 620) || d >= bd) continue;
+        const d = hyp(o.x - e.x, o.y - e.y); if (d > (guard ? 460 : 500) || d >= bd) continue;
         if (guard && this.inSafe(o.x, o.y)) continue;
         if (!this.canSee(e, o)) continue; best = o; bd = d;
       }
-      if (best && (!B.tgt || B.tgt !== best.id)) { if (!B.tgt) B.react = now + rand(320, 680) * (guard ? 1.25 : 1); B.tgt = best.id; }
+      if (best && (!B.tgt || B.tgt !== best.id)) { if (!B.tgt) B.react = now + rand(650, 1150) * (guard ? 1.15 : 1); B.tgt = best.id; }
       if (!best && B.tgt) { const t = this.byId(B.tgt); if (!t || !this.alive(t) || hyp(t.x - e.x, t.y - e.y) > 900) B.tgt = null; else if (!this.canSee(e, t)) { B.goal = { x: t.x, y: t.y }; B.tgt = null; } }
       if (guard && e.home && (hyp(e.x - e.home.x, e.y - e.home.y) > 1100 || this.inSafe(e.x, e.y, 40))) { B.tgt = null; B.goal = { x: e.home.x, y: e.home.y }; B.wait = now + 3000; }
       if (guard && B.tgt) { const t0 = this.byId(B.tgt); if (t0 && this.inSafe(t0.x, t0.y)) { B.tgt = null; B.goal = { x: e.home.x, y: e.home.y }; } }
@@ -688,7 +699,7 @@ class Room {
     if (t && this.alive(t)) {
       const dx = t.x - e.x, dy = t.y - e.y, d = hyp(dx, dy), ang = Math.atan2(dy, dx);
       const w = e.w[e.cw];
-      const lead = w ? d / w.st.spd : 0, sp = S.SPEED * .8;
+      const lead = w ? d / w.st.spd : 0, sp = S.SPEED * .45;
       const aim = Math.atan2(dy + (t.moving ? t.my * sp * lead : 0), dx + (t.moving ? t.mx * sp * lead : 0));
       e.a = aim + (Math.random() - .5) * B.err * 2;
       const want = w ? Math.min(w.st.rng * .5, 380) : 0;
@@ -696,10 +707,10 @@ class Room {
       e.mx = Math.cos(ang) * fwd + Math.cos(ang + Math.PI / 2) * B.strafe * .8; e.my = Math.sin(ang) * fwd + Math.sin(ang + Math.PI / 2) * B.strafe * .8;
       if (w && w.mag === 0 && e.am[w.st.am] === 0 && e.w[1 - e.cw]) { e.cw = 1 - e.cw; e.rlOn = false; }
       if (w && now > B.react && d < w.st.rng * .95) {
-        if (now > B.pauseUntil) { B.fireUntil = now + rand(250, 600); B.pauseUntil = B.fireUntil + rand(350, 900) * (w.st.auto ? 1 : .4); }
+        if (now > B.pauseUntil) { B.fireUntil = now + rand(180, 420); B.pauseUntil = B.fireUntil + rand(650, 1300) * (w.st.auto ? 1 : .6); }
         if (now < B.fireUntil) e.fire = w.st.auto ? true : !e.pfire;
       }
-      if (e.it.gren && d > 150 && d < 380 && Math.random() < .003) this.throwG(e, 'gren');
+      if (e.it.gren && d > 150 && d < 380 && Math.random() < .0012) this.throwG(e, 'gren');
       if (e.act) e.act = null;
       if (guard && this.inSafe(e.x + e.mx * 60, e.y + e.my * 60, 30)) { e.mx = 0; e.my = 0; }
     } else if (e.act && e.act.k === 'search') { e.mx = 0; e.my = 0; }
@@ -741,7 +752,7 @@ class Room {
       for (const ev of this.evs) {
         if (ev.to !== undefined) { if (ev.to === e.id) evs.push(ev); continue; }
         if (ev.g) { evs.push(ev); continue; }
-        if (ev.x !== undefined) { const d = hyp(ev.x - v.x, ev.y - v.y); if (ev.e === 'shot') { if (d < (ev.sil ? 220 : 1400) && ev.id !== e.id) evs.push(ev); } else if (d < 1500) evs.push(ev); }
+        if (ev.x !== undefined) { const d = hyp(ev.x - v.x, ev.y - v.y); if (ev.e === 'shot') { if (d < (ev.sil ? 260 : 2000) && ev.id !== e.id) evs.push(ev); } else if (d < 1500) evs.push(ev); }
       }
       const w = e.w;
       const me = { id: e.id, x: r2(e.x), y: r2(e.y), f: e.f, a: r2(e.a), hp: Math.round(e.hp), ar: e.arL, ad: Math.round(e.arD), st: e.st, cw: e.cw,
