@@ -98,6 +98,22 @@ function moveToKit(a, i) {
   if (STACK[it.k]) { const s = a.kit.find(x => x.k === it.k && (it.k !== 'am' || x.d === it.d)); if (s) { s.n += it.n; persist(a); return null; } }
   a.kit.push(it); persist(a); return null;
 }
+// 탈출 후 장비 유지: 무기 2·방어구 1·탄약·소모품·부착물은 장착(반입) 상태로, 넘치는 건 창고로
+function equipFromRaid(a, items) {
+  const kept = [], stored = [];
+  for (const it of items) {
+    let ok = false;
+    if (it.k === 'w') ok = kitCount(a, 'w') < 2;
+    else if (it.k === 'ar') ok = kitCount(a, 'ar') < 1;
+    else if (it.k !== 'val') ok = true;
+    if (ok) {
+      if (STACK[it.k]) { const s = a.kit.find(x => x.k === it.k && (it.k !== 'am' || x.d === it.d)); if (s) s.n += it.n; else a.kit.push(it); }
+      else a.kit.push(it);
+      kept.push(it);
+    } else { addToStash(a, it); stored.push(it); }
+  }
+  persist(a); return { kept, stored };
+}
 function moveToStash(a, i) { const it = a.kit[i]; if (!it) return '아이템이 없습니다'; a.kit.splice(i, 1); addToStash(a, it); persist(a); return null; }
 function sell(a, i, from) {
   const list = from === 'kit' ? a.kit : a.stash, it = list[i]; if (!it) return '아이템이 없습니다';
@@ -121,4 +137,4 @@ function ranking() {
   rankCache = { total: all.length, xp: top(a => a.xp || 0, true), wins: top(a => a.stats.wins), ext: top(a => a.stats.ext), val: top(a => a.stats.val), kills: top(a => a.stats.kills) };
   rankAt = Date.now(); return rankCache;
 }
-module.exports = { ranking, touchRank, init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };
+module.exports = { ranking, touchRank, equipFromRaid, init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };

@@ -178,7 +178,7 @@ class Room {
     const e = this.mkEnt(c.name, false, 100000 + c.id, c.skin); e.cid = c.id; c.eid = e.id;
     if (c.acc) {
       e.acc = c.acc; const kit = c.acc.kit; c.acc.kit = []; ACC.persist(c.acc);
-      if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.am.light += 12; e.w[0].mag = 0; this.reload(e, this.time); } }
+      if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.am.light += 48; } for (const w of e.w) if (w && w.mag < w.st.mag) { const t = Math.min(w.st.mag - w.mag, e.am[w.st.am] || 0); w.mag += t; e.am[w.st.am] -= t; } }
       e.kitVal = kit.reduce((s, it) => s + S.itemPrice(it), 0);
     }
     // 다른 사람과 먼 입장 포탈
@@ -208,7 +208,7 @@ class Room {
   mkEnt(name, bot, team, skin) {
     const e = { id: this.nid++, name, bot, team, skin, x: 0, y: 0, f: 0, a: 0, hp: 100, arL: 0, arD: 0, st: 'a', w: [null, null], cw: 0, am: { light: 0, rifle: 0, shell: 0, sniper: 0 }, it: { med: 0, band: 1, gren: 0, flash: 0, fuel: 0, smoke: 0 }, bag: [], val: 0,
       mx: 0, my: 0, fire: false, pfire: false, ad: false, rec: 0, rb: 0, lastShot: -1e9, nextShot: 0, rlEnd: 0, rlOn: false, rollUntil: 0, rollCd: 0, rdx: 0, rdy: 0, act: null, car: null, flash: 0, kills: 0, place: 0, plock: -1, tpCd: 0, spec: null, exT: 0, moving: false, dmgT: 0, dmgDealt: 0, boxes: 0, spawnT: this.time, inv: 0 };
-    e.w[0] = newW('pistol'); e.am.light = this.world ? 12 : 24;
+    e.w[0] = newW('pistol'); e.am.light = this.world ? 48 : 24;
     this.ents.push(e); return e;
   }
   mkAI(e, kind) {
@@ -445,7 +445,8 @@ class Room {
     if (w.mag <= 0) this.reload(e, now);
   }
   reload(e, now) {
-    const w = e.w[e.cw]; if (!w || e.rlOn || w.mag >= w.st.mag || e.am[w.st.am] <= 0) return;
+    const w = e.w[e.cw]; if (!w || e.rlOn || w.mag >= w.st.mag) return;
+    if (e.am[w.st.am] <= 0) { if (!e.bot && now - (e.noAmmoMsg || -1e9) > 2500) { e.noAmmoMsg = now; this.evs.push({ e: 'msg', txt: `${S.AMMO[w.st.am]}이 없습니다 · 상자에서 찾거나 다른 무기로 교체하세요`, to: e.id }); } return; }
     e.rlOn = true; e.rlEnd = now + w.st.rl;
   }
   roll(e, dx, dy, now) {
@@ -539,17 +540,17 @@ class Room {
   finish(e, res) {
     if (e.finished) return; e.finished = true;
     if (res === 'mia') e.st = 'x';
-    let saved = null;
+    let saved = null, stored = [];
     if (res === 'extract') { e.st = 'e'; if (e.car) this.exitCar(e); e.deadT = this.time; }
     const xp = this.calcXP(e, res), a = e.acc, carry0 = this.world ? this.carryValue(e) : 0;
     if (a) {
       a.stats.games++; a.stats.kills += e.kills; a.xp = (a.xp || 0) + xp; ACC.touchRank();
       if (res === 'win') a.stats.wins++;
-      if (res === 'extract' && this.world) { a.stats.ext++; a.stats.val += e.val; a.money += e.val; saved = lootOf(e); for (const it of saved) ACC.addToStash(a, it); }
+      if (res === 'extract' && this.world) { a.stats.ext++; a.stats.val += e.val; a.money += e.val; saved = lootOf(e); const eq = ACC.equipFromRaid(a, saved); saved = eq.kept; stored = eq.stored; }
       ACC.persist(a);
     }
     const c = clients.get(e.cid); if (!c) return;
-    send(c, JSON.stringify({ t: 'result', res, world: this.world ? 1 : 0, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(Math.max(0, this.time - (e.spawnT || 0)) / 1000), mode: this.mode, saved: saved ? saved.map(it => S.itemName(it) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')) : null, lost: this.world && res !== 'extract' ? Math.round(e.kitVal || 0) : 0, acct: !!a, xp, carry: carry0, dmg: Math.round(e.dmgDealt), boxes: e.boxes, totalXp: a ? a.xp : null }));
+    send(c, JSON.stringify({ t: 'result', res, world: this.world ? 1 : 0, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(Math.max(0, this.time - (e.spawnT || 0)) / 1000), mode: this.mode, saved: saved ? saved.map(it => S.itemName(it) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')) : null, stored: stored.map(it => S.itemName(it)), lost: this.world && res !== 'extract' ? Math.round(e.kitVal || 0) : 0, acct: !!a, xp, carry: carry0, dmg: Math.round(e.dmgDealt), boxes: e.boxes, totalXp: a ? a.xp : null }));
     if (a && c.acc === a) sendAcc(c);
   }
   aliveTeams() { const s = new Set(); for (const e of this.ents) if (this.alive(e) && e.team !== 9999) s.add(e.team); return s; }
