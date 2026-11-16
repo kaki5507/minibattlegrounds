@@ -503,7 +503,21 @@ class Room {
     v.spec = src && this.alive(src) ? src.id : null;
     if (!v.bot) this.finish(v, 'dead');
   }
+  carryValue(e) {
+    let v = e.val || 0;
+    for (const w of e.w) if (w) { v += S.itemPrice({ k: 'w', w: wSer(w) }); v += (S.PRICE.am[w.st.am] || 0) * w.mag; }
+    if (e.arL && e.arD > 5) v += S.itemPrice({ k: 'ar', d: e.arL, n: e.arD });
+    for (const k in e.am) v += (S.PRICE.am[k] || 0) * e.am[k];
+    for (const k in e.it) v += (S.PRICE.it[k] || 0) * e.it[k];
+    v += e.bag.length * S.PRICE.att;
+    return Math.round(v);
+  }
   calcXP(e, res) {
+    if (this.world) {
+      // 레이드: 죽거나 시간 초과면 경험치 없음, 탈출하면 들고 나온 가치에 따라
+      if (res === 'dead' || res === 'mia') return 0;
+      return Math.round(150 + e.kills * 150 + e.boxes * 10 + this.carryValue(e) * .12);
+    }
     const alive = Math.max(0, ((e.st === 'a' || e.st === 'd' ? this.time : (e.deadT || this.time)) - (e.spawnT || 0)) / 1000);
     let xp = e.kills * 120 + e.dmgDealt * .6 + Math.min(alive, 1500) * .4 + e.boxes * 15;
     if (res === 'win') xp += 600;
@@ -516,15 +530,15 @@ class Room {
     if (res === 'mia') e.st = 'x';
     let saved = null;
     if (res === 'extract') { e.st = 'e'; if (e.car) this.exitCar(e); e.deadT = this.time; }
-    const xp = this.calcXP(e, res), a = e.acc;
+    const xp = this.calcXP(e, res), a = e.acc, carry0 = this.world ? this.carryValue(e) : 0;
     if (a) {
-      a.stats.games++; a.stats.kills += e.kills; a.xp = (a.xp || 0) + xp;
+      a.stats.games++; a.stats.kills += e.kills; a.xp = (a.xp || 0) + xp; ACC.touchRank();
       if (res === 'win') a.stats.wins++;
       if (res === 'extract' && this.world) { a.stats.ext++; a.stats.val += e.val; a.money += e.val; saved = lootOf(e); for (const it of saved) ACC.addToStash(a, it); }
       ACC.persist(a);
     }
     const c = clients.get(e.cid); if (!c) return;
-    send(c, JSON.stringify({ t: 'result', res, world: this.world ? 1 : 0, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(Math.max(0, this.time - (e.spawnT || 0)) / 1000), mode: this.mode, saved: saved ? saved.map(it => S.itemName(it) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')) : null, lost: this.world && res !== 'extract' ? Math.round(e.kitVal || 0) : 0, acct: !!a, xp, dmg: Math.round(e.dmgDealt), boxes: e.boxes, totalXp: a ? a.xp : null }));
+    send(c, JSON.stringify({ t: 'result', res, world: this.world ? 1 : 0, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(Math.max(0, this.time - (e.spawnT || 0)) / 1000), mode: this.mode, saved: saved ? saved.map(it => S.itemName(it) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')) : null, lost: this.world && res !== 'extract' ? Math.round(e.kitVal || 0) : 0, acct: !!a, xp, carry: carry0, dmg: Math.round(e.dmgDealt), boxes: e.boxes, totalXp: a ? a.xp : null }));
     if (a && c.acc === a) sendAcc(c);
   }
   aliveTeams() { const s = new Set(); for (const e of this.ents) if (this.alive(e) && e.team !== 9999) s.add(e.team); return s; }
@@ -906,6 +920,7 @@ wss.on('connection', ws => {
       case 'start': if (r && !r.world && r.host === c.id && r.st === 'lobby') { if (r.members.size >= S.MINP || Date.now() - r.created > 8000) r.begin(); else send(c, JSON.stringify({ t: 'err', txt: '방 생성 8초 후부터 봇과 시작할 수 있습니다' })); } break;
       case 'chat': if (r) { const txt = String(m.txt || '').slice(0, 60); if (txt) for (const h of r.humans()) send(h, JSON.stringify({ t: 'chat', name: c.name, txt })); } break;
       case 'ping': send(c, JSON.stringify({ t: 'pong', c: m.c })); break;
+      case 'rank': send(c, JSON.stringify({ t: 'rank', data: ACC.ranking(), me: c.acc ? c.acc.name : null })); break;
     }
   });
   ws.on('close', () => { if (c.room) { const r = rooms.get(c.room); if (r) r.leave(c); } clients.delete(c.id); });

@@ -29,7 +29,7 @@ function setConn(t, cls) { const c = $('conn'); c.textContent = t; c.className =
 function connect() {
   setConn('CONNECTING');
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { setConn('ONLINE', 'ok'); const t = getTok(); if (t) sendM({ t: 'auth', token: t }); hello(); };
+  ws.onopen = () => { setConn('ONLINE', 'ok'); sendM({ t: 'rank' }); const t = getTok(); if (t) sendM({ t: 'auth', token: t }); hello(); };
   ws.onclose = () => { setConn('RECONNECTING', 'bad'); setTimeout(connect, 2000); if (G) { G = null; show('menu'); } };
   ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } onMsg(m); };
 }
@@ -55,7 +55,8 @@ function onMsg(m) {
     case 'logout': acct = null; setTok(null); updStats(); closeModal('stashm'); if (m.txt) toast(m.txt); hello(); break;
     case 'start': startGame(m); break;
     case 's': if (G) onSnap(m); break;
-    case 'result': onResult(m); break;
+    case 'result': onResult(m); setTimeout(() => sendM({ t: 'rank' }), 1500); break;
+    case 'rank': rankData = m.data; rankMe = m.me; renderRankCard(); if ($('rankm').classList.contains('on')) renderRank(); break;
   }
 }
 function toast(t) { if (G) { G.msgs.push({ t, until: performance.now() + 4000 }); return; } const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el.tm); el.tm = setTimeout(() => el.style.display = 'none', 3200); }
@@ -137,7 +138,7 @@ function renderRooms(list) {
   lastRooms = list; const el = $('roomList');
   const wd = list.find(r => r.world); list = list.filter(r => !r.world);
   if (wd) { worldInfo = wd; $('qEXn').textContent = `지금 ${wd.n}명 레이드 중 · 상시 운영`; if ($('raidm').classList.contains('on')) renderRaid(); }
-  const wHtml = wd ? `<div class="ri world"><div style="min-width:0"><div class="nm">레이드 월드 <span class="tag acc">상시 운영</span></div><div class="sub">상시 운영 · 던전 5개 · 아무 때나 입장${wd.n ? ` · ${wd.dg.filter(d => d.n).map(d => d.name + ' ' + d.n).join(', ') || '야외 ' + wd.out}` : ''}</div></div><div class="cnt">${wd.n}<i>명</i></div><button class="b" data-world="1">입장</button></div>` : '';
+  const wHtml = ''; const _unused = wd ? `<div class="ri world"><div style="min-width:0"><div class="nm">레이드 월드 <span class="tag acc">상시 운영</span></div><div class="sub">상시 운영 · 던전 5개 · 아무 때나 입장${wd.n ? ` · ${wd.dg.filter(d => d.n).map(d => d.name + ' ' + d.n).join(', ') || '야외 ' + wd.out}` : ''}</div></div><div class="cnt">${wd.n}<i>명</i></div><button class="b" data-world="1">입장</button></div>` : '';
   if (!list.length) { el.innerHTML = wHtml + '<div class="empty">열린 배틀로얄 방이 없습니다.<br>빠른 입장을 누르거나 방을 직접 만들어 보세요.</div>'; const wb = el.querySelector('[data-world]'); if (wb) wb.onclick = () => $('qEX').onclick(); return; }
   el.innerHTML = list.map(r => `<div class="ri"><div style="min-width:0"><div class="nm">${r.lk ? '<span class="lock"></span>' : ''}${esc(r.name)}</div><div class="sub">배틀로얄 · ${TSN[r.ts]}${r.lk ? ' · 비공개' : ''}</div></div>
     <div class="cnt">${r.n}<i>/10</i></div>${r.st === 'play' ? '<span class="tag live">진행중</span>' : `<button class="${r.lk ? 'g' : ''}" data-j="${r.id}" data-lk="${r.lk}">입장</button>`}</div>`).join('');
@@ -157,6 +158,30 @@ function renderRoom() {
   $('startBtn').textContent = r.players.length >= 5 ? '지금 시작' : '봇 채우고 시작';
 }
 setInterval(() => { if (curRoom && curRoom.cd != null && !G) { curRoom.cd = Math.max(0, curRoom.cd - 250); renderRoom(); } }, 250);
+
+// ───────── 랭킹 ─────────
+let rankData = null, rankMe = null, rankTab = 'xp';
+const RANKT = { xp: ['레벨', r => `Lv.${r.l}`, r => `${r.v.toLocaleString()} XP`], wins: ['1등', r => `${r.v}회`, r => `Lv.${r.l}`], ext: ['탈출', r => `${r.v}회`, r => `Lv.${r.l}`], val: ['전리품', r => `${r.v.toLocaleString()}원`, r => `Lv.${r.l}`], kills: ['킬', r => `${r.v}킬`, r => `Lv.${r.l}`] };
+setInterval(() => { if (!G) sendM({ t: 'rank' }); }, 30000);
+function renderRankCard() {
+  const el = $('rankCard'); if (!el || !rankData) return;
+  const t = rankData.xp[0], w = rankData.wins[0];
+  el.innerHTML = `<div class="rhead"><div class="lbl" style="margin:0">Ranking</div><button class="g" id="rankBtn" style="padding:6px 12px;font-size:12px">전체 랭킹</button></div>
+   ${t ? `<div class="r1"><span class="crown">1</span><div style="min-width:0"><b>${esc(t.name)}</b><small>레벨 1위 · Lv.${t.l} · ${t.v.toLocaleString()} XP</small></div></div>` : '<div class="empty" style="padding:12px">아직 랭킹이 없습니다. 첫 번째 주인공이 되어 보세요.</div>'}
+   ${w ? `<div class="r1 sub"><span class="crown">1</span><div style="min-width:0"><b>${esc(w.name)}</b><small>최다 1등 · ${w.v}회</small></div></div>` : ''}`;
+  $('rankBtn').onclick = () => { renderRank(); $('rankm').classList.add('on'); sendM({ t: 'rank' }); };
+}
+function renderRank() {
+  const D = rankData; if (!D) return;
+  const list = D[rankTab] || [], T = RANKT[rankTab];
+  const myIdx = rankMe ? list.findIndex(r => r.name === rankMe) : -1;
+  $('rankBox').innerHTML = `<div class="row" style="justify-content:space-between"><h3>랭킹 <small>계정 ${D.total}명 · 10초마다 갱신</small></h3><button class="g" id="rankX">닫기</button></div>
+   <div class="segs" style="margin:12px 0">${Object.entries(RANKT).map(([k, v]) => `<label class="seg"><input type="radio" name="rtab" value="${k}" ${k === rankTab ? 'checked' : ''}><span>${v[0]}</span></label>`).join('')}</div>
+   <div class="rl">${list.map((r, i) => `<div class="rr ${r.name === rankMe ? 'me' : ''} ${i < 3 ? 't' + (i + 1) : ''}"><span class="no">${i + 1}</span><b>${esc(r.name)}</b><span class="v">${T[1](r)}</span><small>${T[2](r)}</small></div>`).join('') || '<div class="empty">아직 기록이 없습니다</div>'}</div>
+   <div class="rnote">${rankMe ? (myIdx >= 0 ? `내 순위: <b>${myIdx + 1}위</b>` : '내 순위: 30위 밖') : '로그인한 계정만 랭킹에 올라갑니다.'}</div>`;
+  $('rankX').onclick = () => closeModal('rankm');
+  document.querySelectorAll('input[name=rtab]').forEach(r => r.onchange = () => { rankTab = r.value; renderRank(); });
+}
 
 // ───────── 창고 · 상인 ─────────
 let stTab = 'stash', stOpen = null;
@@ -547,7 +572,7 @@ function onResult(m) {
     if (m.res === 'extract') body = `<p class="rp">전리품 <b style="color:var(--acc)">${m.val.toLocaleString()}원</b>${m.acct ? ' 획득' : ''}</p>${m.saved && m.saved.length ? `<div class="rp2">창고에 저장: ${m.saved.map(esc).join(', ')}</div>` : !m.acct ? '<div class="rp2">로그인하면 아이템이 창고에 저장됩니다</div>' : ''}`;
     else body = `<p class="rp" style="color:#e08a7f">들고 들어간 장비${m.lost ? ` (${m.lost.toLocaleString()}원 상당)` : ''}와 전리품을 모두 잃었습니다</p>`;
   }
-  const xpBar = `<div class="xpbox"><div class="xprow"><b>+${m.xp.toLocaleString()} XP</b><span>${L1.l > L0.l ? `<em>LEVEL UP</em> ` : ''}Lv.${L1.l}</span></div><div class="xpbar"><i style="width:${Math.round(L1.cur / L1.need * 100)}%"></i></div><div class="xpsub">킬 ${m.kills} · 피해 ${m.dmg} · 수색 ${m.boxes}${m.res === 'win' ? ' · 우승 보너스' : m.res === 'extract' ? ' · 탈출 보너스' : ''}</div></div>`;
+  const xpBar = `<div class="xpbox"><div class="xprow"><b style="${m.xp ? '' : 'color:var(--tx3)'}">+${m.xp.toLocaleString()} XP</b><span>${L1.l > L0.l ? `<em>LEVEL UP</em> ` : ''}Lv.${L1.l}</span></div><div class="xpbar"><i style="width:${Math.round(L1.cur / L1.need * 100)}%"></i></div><div class="xpsub">${m.world ? (m.res === 'extract' ? `탈출 아이템 가치 ${m.carry.toLocaleString()}원 · 킬 ${m.kills} · 수색 ${m.boxes}` : '레이드에서 죽거나 시간 초과면 경험치를 얻지 못합니다') : `킬 ${m.kills} · 피해 ${m.dmg} · 수색 ${m.boxes}${m.res === 'win' ? ' · 우승 보너스' : ''}`}</div></div>`;
   $('resBox').innerHTML = `<div class="rk">${T[0]}</div><h2>${T[1]}</h2>
    <div class="rs"><div><b>${!m.world ? '#' + m.place : (m.res === 'extract' ? 'OK' : '—')}</b><small>${!m.world ? '순위' : '탈출'}</small></div><div><b>${m.kills}</b><small>킬</small></div><div><b>${Math.floor(m.time / 60)}:${String(m.time % 60).padStart(2, '0')}</b><small>생존 시간</small></div></div>
    ${body}${xpBar}
@@ -557,7 +582,7 @@ function onResult(m) {
   if ($('toLobby')) $('toLobby').onclick = () => { $('res').classList.remove('on'); toast('게임이 끝나면 대기실로 돌아갑니다'); };
   $('toMenu').onclick = () => { $('res').classList.remove('on'); sendM({ t: 'leave' }); };
 }
-function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop', 'stashm', 'authm', 'pwm', 'raidm']) $(id).classList.remove('on'); }
+function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop', 'stashm', 'authm', 'pwm', 'raidm', 'rankm']) $(id).classList.remove('on'); }
 
 // ───────── 입력 ─────────
 const cv = $('cv'), ctx = cv.getContext('2d');

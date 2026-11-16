@@ -111,4 +111,14 @@ function buy(a, id) {
   a.money -= p.price; addToStash(a, it); persist(a); return null;
 }
 
-module.exports = { init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };
+// ───── 랭킹 ─────
+let rankCache = null, rankAt = 0;
+function touchRank() { rankAt = 0; }
+function ranking() {
+  if (rankCache && Date.now() - rankAt < 10000) return rankCache;
+  const all = [...accounts.values()];
+  const top = (f, keep0) => all.map(a => ({ name: a.name, v: f(a), l: S.levelOf(a.xp || 0).l, c: a.created || 0 })).filter(r => keep0 || r.v > 0).sort((x, y) => y.v - x.v || x.c - y.c).slice(0, 30).map(({ c, ...r }) => r);
+  rankCache = { total: all.length, xp: top(a => a.xp || 0, true), wins: top(a => a.stats.wins), ext: top(a => a.stats.ext), val: top(a => a.stats.val), kills: top(a => a.stats.kills) };
+  rankAt = Date.now(); return rankCache;
+}
+module.exports = { ranking, touchRank, init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };
