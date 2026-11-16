@@ -10,7 +10,7 @@ const accounts = new Map(); // key(소문자 이름) -> 계정
 const tokens = new Map();   // 토큰 해시 -> key
 let pool = null;
 const FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'accounts.json');
-const STASH_MAX = 80;
+const STASH_MAX = 150;
 
 const keyOf = n => String(n || '').trim().toLowerCase();
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');

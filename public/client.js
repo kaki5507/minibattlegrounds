@@ -78,7 +78,7 @@ function renderRaid() {
    <div class="rbig"><b>${w ? w.n : '-'}</b><span>명이 지금 레이드 중</span></div>
    <div style="font-size:12px;color:var(--tx3)">${w ? `서버 가동 ${fmtUp(w.up)} · 입장 지점 16곳 · 고정 탈출구 5곳${w.drops ? ` · 보급 ${w.drops}개 투하됨` : ''}` : '현황을 불러오는 중'}</div>
    <div class="dgl">${w ? w.dg.map(d => `<div class="dgr" style="--c:${DGCOL[d.tier]}"><div><b>${esc(d.name)}</b><small>위험도 ${'■'.repeat(d.tier)}${'□'.repeat(5 - d.tier)}</small></div><span class="gn">경비 ${d.g}</span><span class="pn">${d.n}<i>명</i></span></div>`).join('') + `<div class="dgr" style="--c:#5c656d"><div><b>던전 밖 (야외·오두막)</b><small>입장 지점과 포탈 주변은 몬스터가 오지 않는 안전지대</small></div><span class="gn"></span><span class="pn">${w.out}<i>명</i></span></div>` : ''}</div>
-   <div class="rkit">${acct ? (kitN ? `<b style="color:var(--tx)">들고 갈 장비</b> · ${kitV.toLocaleString()}원 상당 · 죽으면 모두 잃습니다<br>${acct.kit.map(it => esc(S.itemName(it)) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')).join(', ')}` : '들고 갈 장비가 없습니다. 기본 지급: 권총 + 경량탄 60발 + 붕대') + ' <a href="#" id="raidKit" style="color:var(--acc)">장비 바꾸기</a>' : '손님은 기본 권총(경량탄 60발)으로 들어가고, 탈출해도 장비가 남지 않습니다. <a href="#" id="raidLogin" style="color:var(--acc)">로그인</a>'}</div>
+   <div class="rkit">${acct ? (kitN ? `<b style="color:var(--tx)">들고 갈 장비</b> · ${kitV.toLocaleString()}원 상당 · 죽으면 모두 잃습니다<br>${acct.kit.map(it => esc(S.itemName(it)) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')).join(', ')}` : '들고 갈 장비가 없습니다. 기본 지급: 무한 탄약 권총 + 붕대') + ' <a href="#" id="raidKit" style="color:var(--acc)">장비 바꾸기</a>' : '손님은 기본 권총(무한 탄약)으로 들어가고, 탈출해도 장비가 남지 않습니다. <a href="#" id="raidLogin" style="color:var(--acc)">로그인</a>'}</div>
    <button class="y" id="raidGo" style="width:100%;padding:14px;font-size:15px">지금 바로 입장</button>`;
   $('raidX').onclick = () => closeModal('raidm');
   $('raidGo').onclick = () => { closeModal('raidm'); hello(); sendM({ t: 'quick', mode: 'ex' }); };
@@ -212,7 +212,7 @@ function renderStash() {
   <div class="stgrid"><div class="stcol">${left}</div>
   <div class="stcol"><div class="lbl"><span>장착 장비 (레이드 반입)</span><span>${kitVal.toLocaleString()}</span></div>
     <div class="items">${A.kit.map((it, i) => itemCard(it, i, 'kit', '<button class="g" data-op="unkit">창고로</button>')).join('') || '<div class="empty" style="padding:20px 6px">반입할 장비가 없습니다.<br>창고에서 아이템을 눌러 반입하세요.</div>'}</div>
-    <div class="kitnote">무기 ${kitW}/2 · 방어구 ${kitA}/1<br>레이드에 들어가면 이 장비를 들고 시작합니다. <b style="color:var(--tx2)">탈출하면</b> 들고 나온 무기·방어구·탄약이 그대로 이 칸에 장착되어 다음 레이드에 다시 들고 갑니다(한도 초과분은 창고로, 귀중품은 돈으로). <b style="color:#e08a7f">죽거나 시간 초과면</b> 반입한 장비를 모두 잃습니다.</div>
+    <div class="kitnote">무기 ${kitW}/2 · 방어구 ${kitA}/1<br>레이드에 들어가면 이 장비를 들고 시작합니다. <b style="color:var(--tx2)">탈출하면</b> 들고 나온 무기·방어구·탄약이 그대로 이 칸에 장착되어 다음 레이드에 다시 들고 갑니다(한도 초과분과 귀중품은 창고로 — 팔지 말지는 창고에서 직접 결정). 기본 권총은 무한 탄약이고 저장되지 않습니다. <b style="color:#e08a7f">죽거나 시간 초과면</b> 반입한 장비를 모두 잃습니다.</div>
   </div></div>`;
   $('stX').onclick = () => closeModal('stashm');
   document.querySelectorAll('input[name=sttab]').forEach(r => r.onchange = () => { stTab = r.value; stOpen = null; renderStash(); });
@@ -569,7 +569,7 @@ function onResult(m) {
   const T = { win: ['WINNER', '최후의 생존자'], dead: ['ELIMINATED', '사망'], extract: ['EXTRACTED', '탈출 성공'], mia: ['MISSING IN ACTION', '시간 초과'] }[m.res];
   let body = '';
   if (m.world) {
-    if (m.res === 'extract') body = `<p class="rp">전리품 <b style="color:var(--acc)">${m.val.toLocaleString()}원</b>${m.acct ? ' 획득' : ''}</p>${m.saved && m.saved.length ? `<div class="rp2"><b style="color:#8be0a6">장착 유지 · 다음 레이드에 그대로</b><br>${m.saved.map(esc).join(', ')}</div>` : !m.acct ? '<div class="rp2">로그인하면 들고 나온 장비가 계정에 남아 다음 레이드에 그대로 들고 들어갑니다</div>' : ''}${m.stored && m.stored.length ? `<div class="rp2" style="margin-top:4px">한도 초과로 창고로: ${m.stored.map(esc).join(', ')}</div>` : ''}`;
+    if (m.res === 'extract') body = `<p class="rp">귀중품 가치 <b style="color:var(--acc)">${m.val.toLocaleString()}원</b>${m.acct ? ' · 창고에 보관 (팔지 말지는 창고에서 결정)' : ''}</p>${m.saved && m.saved.length ? `<div class="rp2"><b style="color:#8be0a6">장착 유지 · 다음 레이드에 그대로</b><br>${m.saved.map(esc).join(', ')}</div>` : !m.acct ? '<div class="rp2">로그인하면 들고 나온 장비가 계정에 남아 다음 레이드에 그대로 들고 들어갑니다</div>' : ''}${m.stored && m.stored.length ? `<div class="rp2" style="margin-top:4px"><b style="color:var(--tx2)">창고로</b> · ${m.stored.map(esc).join(', ')}</div>` : ''}`;
     else body = `<p class="rp" style="color:#e08a7f">들고 들어간 장비${m.lost ? ` (${m.lost.toLocaleString()}원 상당)` : ''}와 전리품을 모두 잃었습니다</p>`;
   }
   const xpBar = `<div class="xpbox"><div class="xprow"><b style="${m.xp ? '' : 'color:var(--tx3)'}">+${m.xp.toLocaleString()} XP</b><span>${L1.l > L0.l ? `<em>LEVEL UP</em> ` : ''}Lv.${L1.l}</span></div><div class="xpbar"><i style="width:${Math.round(L1.cur / L1.need * 100)}%"></i></div><div class="xpsub">${m.world ? (m.res === 'extract' ? `탈출 아이템 가치 ${m.carry.toLocaleString()}원 · 킬 ${m.kills} · 수색 ${m.boxes}` : '레이드에서 죽거나 시간 초과면 경험치를 얻지 못합니다') : `킬 ${m.kills} · 피해 ${m.dmg} · 수색 ${m.boxes}${m.res === 'win' ? ' · 우승 보너스' : ''}`}</div></div>`;
@@ -755,7 +755,7 @@ function openInv() {
   const wcard = (w, i) => {
     if (!w) return `<div class="wcard" style="opacity:.5">${i + 1}번 슬롯 · 비어 있음</div>`;
     return `<div class="wcard" style="border-color:${me.cw === i ? 'var(--acc)' : 'var(--line)'}"><div class="row" style="justify-content:space-between"><b style="color:${w.c}">${i + 1}. ${esc(w.n)}</b><span>${me.cw === i ? '<span class="tag acc">사용 중</span>' : `<button data-sl="${i}" style="padding:4px 10px">들기</button>`} <button class="r" data-dw="${i}" style="padding:4px 10px">버리기</button>${G.loot ? ` <button class="g" data-st="${i}" style="padding:4px 10px">상자에 넣기</button>` : ''}</span></div>
-      <div style="font-size:12px;color:var(--tx2);margin:6px 0">피해 ${w.dmg} · ${Math.round(60000 / w.iv)}RPM · 사거리 ${w.rng} · 탄속 ${w.spd} · 반동 ${w.rc} · 이동 ${Math.round(w.mv * 100)}% · ${w.auto ? '연발' : '단발'} · ${S.AMMO[w.am]} ${w.mag}/${w.max}</div>
+      <div style="font-size:12px;color:var(--tx2);margin:6px 0">피해 ${w.dmg} · ${Math.round(60000 / w.iv)}RPM · 사거리 ${w.rng} · 탄속 ${w.spd} · 반동 ${w.rc} · 이동 ${Math.round(w.mv * 100)}% · ${w.auto ? '연발' : '단발'} · ${w.inf ? '무한 탄약' : S.AMMO[w.am]} ${w.mag}/${w.max}${w.free ? ' · 기본 지급(탈출해도 저장 안 됨)' : ''}</div>
       <div>${S.SLOTS.map(sl => { const a = w.att[sl]; return a ? `<span class="att on" data-det="${i}:${sl}">${S.ATT[a].n} ✕</span>` : `<span class="att">${{ muzzle: '총구', barrel: '총열', mag: '탄창', stock: '개머리', scope: '조준경' }[sl]} -</span>`; }).join('')}</div></div>`;
   };
   $('invBox').innerHTML = `<div class="row" style="justify-content:space-between"><h3>가방 <small>무기·부착물·소모품</small></h3><button class="g" id="invX">닫기</button></div>
@@ -1016,8 +1016,8 @@ function drawHUD(now, vx, vy, sc, camx, camy) {
   ctx.textAlign = 'right'; ctx.fillText(compact ? `구급${me.it.med} 붕대${me.it.band} 투척${me.it.gren + me.it.flash + me.it.smoke}` : `구급 ${me.it.med} · 붕대 ${me.it.band} · 수류탄 ${me.it.gren} · 섬광 ${me.it.flash} · 연막 ${me.it.smoke}${me.it.fuel ? ' · 연료 ' + me.it.fuel : ''}`, bx + bw, by - 10);
   if (cw) {
     ctx.textAlign = 'left'; ctx.font = `800 16px ${FONT}`; ctx.fillStyle = cw.mag === 0 ? '#ff6b5a' : '#e6e9ec'; ctx.fillText(cw.n, bx, by - 30);
-    ctx.textAlign = 'right'; ctx.font = `800 18px ${FONT}`; ctx.fillText(`${cw.mag}`, bx + bw - 62, by - 30); ctx.font = `600 12px ${FONT}`; ctx.fillStyle = me.am[cw.am] ? '#8b959e' : '#ff6b5a'; ctx.fillText(`/ ${cw.max}  ·  ${me.am[cw.am] || '탄 없음'}`, bx + bw, by - 30);
-    if (!me.am[cw.am] && cw.mag === 0) { ctx.textAlign = 'center'; ctx.font = `700 12px ${FONT}`; ctx.fillStyle = '#ff8a7a'; ctx.fillText(`${S.AMMO[cw.am]} 없음 · 상자에서 찾거나 무기 교체`, W / 2, by - 66); }
+    ctx.textAlign = 'right'; ctx.font = `800 18px ${FONT}`; ctx.fillText(`${cw.mag}`, bx + bw - 62, by - 30); ctx.font = `600 12px ${FONT}`; ctx.fillStyle = cw.inf || me.am[cw.am] ? '#8b959e' : '#ff6b5a'; ctx.fillText(`/ ${cw.max}  ·  ${cw.inf ? '∞' : me.am[cw.am] || '탄 없음'}`, bx + bw, by - 30);
+    if (!cw.inf && !me.am[cw.am] && cw.mag === 0) { ctx.textAlign = 'center'; ctx.font = `700 12px ${FONT}`; ctx.fillStyle = '#ff8a7a'; ctx.fillText(`${S.AMMO[cw.am]} 없음 · 상자에서 찾거나 무기 교체`, W / 2, by - 66); }
     const other = me.w[1 - me.cw]; if (other && !compact) { ctx.textAlign = 'left'; ctx.font = `600 11px ${FONT}`; ctx.fillStyle = '#5c656d'; ctx.fillText(`보조: ${other.n} ${other.mag}/${other.max}`, bx, by - 47); }
     if (me.rec > 6) { ctx.textAlign = 'center'; ctx.font = `700 12px ${FONT}`; ctx.fillStyle = '#ff8a7a'; ctx.fillText('반동 누적 · 끊어 쏘세요', W / 2, by - 66); }
   } else if (alive) { ctx.textAlign = 'center'; ctx.font = `700 14px ${FONT}`; ctx.fillStyle = '#ff8a7a'; ctx.fillText('무기 없음 · 상자를 수색하세요', W / 2, by - 30); }

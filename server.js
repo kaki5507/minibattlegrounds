@@ -40,6 +40,7 @@ const PEACE_MS = 60000, RAID_MS = 25 * 60000;
 function newW(id, base) { const w = { id, att: {}, base: base || null, mag: 0 }; w.st = S.stats(w); w.mag = w.st.mag; return w; }
 function restat(w) { w.st = S.stats(w); }
 function wscore(w) { if (!w) return 0; const s = w.st; return s.dmg * s.pel * 1000 / s.iv * Math.min(1, s.rng / 700) * (s.scope ? 1.2 : 1); }
+const INF = w => w && w.id === 'pistol'; // 권총은 무한 탄약
 const AMCAP = { light: 300, rifle: 300, shell: 60, sniper: 40 };
 
 // ───────── 루팅 테이블 ─────────
@@ -178,7 +179,7 @@ class Room {
     const e = this.mkEnt(c.name, false, 100000 + c.id, c.skin); e.cid = c.id; c.eid = e.id;
     if (c.acc) {
       e.acc = c.acc; const kit = c.acc.kit; c.acc.kit = []; ACC.persist(c.acc);
-      if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.am.light += 48; } for (const w of e.w) if (w && w.mag < w.st.mag) { const t = Math.min(w.st.mag - w.mag, e.am[w.st.am] || 0); w.mag += t; e.am[w.st.am] -= t; } }
+      if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.w[0].free = 1; } for (const w of e.w) if (w && w.mag < w.st.mag) { if (INF(w)) { w.mag = w.st.mag; continue; } const t = Math.min(w.st.mag - w.mag, e.am[w.st.am] || 0); w.mag += t; e.am[w.st.am] -= t; } }
       e.kitVal = kit.reduce((s, it) => s + S.itemPrice(it), 0);
     }
     // 다른 사람과 먼 입장 포탈
@@ -208,7 +209,7 @@ class Room {
   mkEnt(name, bot, team, skin) {
     const e = { id: this.nid++, name, bot, team, skin, x: 0, y: 0, f: 0, a: 0, hp: 100, arL: 0, arD: 0, st: 'a', w: [null, null], cw: 0, am: { light: 0, rifle: 0, shell: 0, sniper: 0 }, it: { med: 0, band: 1, gren: 0, flash: 0, fuel: 0, smoke: 0 }, bag: [], val: 0,
       mx: 0, my: 0, fire: false, pfire: false, ad: false, rec: 0, rb: 0, lastShot: -1e9, nextShot: 0, rlEnd: 0, rlOn: false, rollUntil: 0, rollCd: 0, rdx: 0, rdy: 0, act: null, car: null, flash: 0, kills: 0, place: 0, plock: -1, tpCd: 0, spec: null, exT: 0, moving: false, dmgT: 0, dmgDealt: 0, boxes: 0, spawnT: this.time, inv: 0 };
-    e.w[0] = newW('pistol'); e.am.light = this.world ? 48 : 24;
+    e.w[0] = newW('pistol'); e.w[0].free = 1; e.am.light = 0;
     this.ents.push(e); return e;
   }
   mkAI(e, kind) {
@@ -258,7 +259,7 @@ class Room {
     const putBack = o => { if (box) box.items.push(o); else this.addItem(e.x + rand(-18, 18), e.y + rand(-18, 18), e.f, o); };
     switch (it.k) {
       case 'am': { const room = AMCAP[it.d] - e.am[it.d]; if (room <= 0) return false; const t = Math.min(room, it.n); e.am[it.d] += t; it.n -= t; return it.n <= 0 ? true : 'p'; }
-      case 'val': e.val += it.n; e.vals = (e.vals || 0) + 1; return true;
+      case 'val': e.val += it.n; e.vals = (e.vals || 0) + 1; (e.valItems = e.valItems || []).push({ k: 'val', d: it.d, n: it.n }); return true;
       case 'ar': if (e.bot && (it.d < e.arL || (it.d === e.arL && it.n <= e.arD))) return false; if (e.arL && e.arD > 5) putBack({ k: 'ar', d: e.arL, n: Math.round(e.arD) }); e.arL = it.d; e.arD = it.n; return true;
       case 'att': return this.giveAtt(e, it.d);
       case 'w': {
@@ -376,7 +377,7 @@ class Room {
     if (e.act && e.act.k === 'search') { const b = this.boxes.get(e.act.target); if (!b || hyp(b.x - e.x, b.y - e.y) > 80) e.act = null; }
     const w = e.w[e.cw];
     if (w && now - e.lastShot > 140) { e.rec = Math.max(0, e.rec - w.st.rr * dt); e.rb *= Math.pow(.1, dt); }
-    if (e.rlOn && now >= e.rlEnd) { e.rlOn = false; if (w) { const need = w.st.mag - w.mag, take = Math.min(need, e.am[w.st.am]); w.mag += take; e.am[w.st.am] -= take; } }
+    if (e.rlOn && now >= e.rlEnd) { e.rlOn = false; if (w) { if (INF(w)) w.mag = w.st.mag; else { const need = w.st.mag - w.mag, take = Math.min(need, e.am[w.st.am]); w.mag += take; e.am[w.st.am] -= take; } } }
     if (e.fire && e.st === 'a') this.tryFire(e, now);
     e.pfire = e.fire;
     if (e.act && now >= e.act.end) this.finishAct(e, now);
@@ -446,7 +447,7 @@ class Room {
   }
   reload(e, now) {
     const w = e.w[e.cw]; if (!w || e.rlOn || w.mag >= w.st.mag) return;
-    if (e.am[w.st.am] <= 0) { if (!e.bot && now - (e.noAmmoMsg || -1e9) > 2500) { e.noAmmoMsg = now; this.evs.push({ e: 'msg', txt: `${S.AMMO[w.st.am]}이 없습니다 · 상자에서 찾거나 다른 무기로 교체하세요`, to: e.id }); } return; }
+    if (!INF(w) && e.am[w.st.am] <= 0) { if (!e.bot && now - (e.noAmmoMsg || -1e9) > 2500) { e.noAmmoMsg = now; this.evs.push({ e: 'msg', txt: `${S.AMMO[w.st.am]}이 없습니다 · 상자에서 찾거나 다른 무기로 교체하세요`, to: e.id }); } return; }
     e.rlOn = true; e.rlEnd = now + w.st.rl;
   }
   roll(e, dx, dy, now) {
@@ -497,11 +498,13 @@ class Room {
     if (!silent && (!this.world || !v.bot || (src && !src.bot))) this.evs.push({ e: 'kill', a: src ? src.name : (wn === 'zone' ? '자기장' : wn || '???'), b: v.name, w: wn === 'zone' ? '자기장' : wn, g: !this.world ? 1 : 0, x: r1(v.x), y: r1(v.y) });
     // 시체 상자
     const items = [];
-    v.w.forEach(w => w && items.push({ k: 'w', w }));
+    v.w.forEach(w => w && !w.free && items.push({ k: 'w', w }));
     for (const k in v.am) if (v.am[k] > 0) items.push({ k: 'am', d: k, n: v.am[k] });
     for (const k in v.it) if (v.it[k] > 0) items.push({ k, n: v.it[k] });
     if (v.arL && v.arD > 5) items.push({ k: 'ar', d: v.arL, n: Math.round(v.arD) });
-    if (v.val > 0) items.push({ k: 'val', d: 4, n: v.val });
+    if (v.valItems && v.valItems.length) { for (const it of v.valItems) items.push(it); const rest = v.val - v.valItems.reduce((a, b) => a + b.n, 0); if (rest > 0) items.push({ k: 'val', d: S.VALUABLES.findIndex(x => x[1] >= rest) < 0 ? 5 : S.VALUABLES.findIndex(x => x[1] >= rest), n: rest }); }
+    else if (v.val > 0) items.push({ k: 'val', d: Math.max(0, S.VALUABLES.findIndex(x => x[1] >= v.val)), n: v.val });
+    v.valItems = [];
     v.bag.forEach(a => items.push({ k: 'att', d: a }));
     if (items.length) { const p = { x: v.x, y: v.y }; S.resolve(this.M, p, 10, v.f); this.addBox(p.x, p.y, v.f, 'body', 0, items, v.name); }
     v.w = [null, null]; v.am = { light: 0, rifle: 0, shell: 0, sniper: 0 }; v.val = 0; v.bag = []; v.arL = 0; v.arD = 0;
@@ -517,7 +520,7 @@ class Room {
   }
   carryValue(e) {
     let v = e.val || 0;
-    for (const w of e.w) if (w) { v += S.itemPrice({ k: 'w', w: wSer(w) }); v += (S.PRICE.am[w.st.am] || 0) * w.mag; }
+    for (const w of e.w) if (w && !w.free) { v += S.itemPrice({ k: 'w', w: wSer(w) }); if (!INF(w)) v += (S.PRICE.am[w.st.am] || 0) * w.mag; }
     if (e.arL && e.arD > 5) v += S.itemPrice({ k: 'ar', d: e.arL, n: e.arD });
     for (const k in e.am) v += (S.PRICE.am[k] || 0) * e.am[k];
     for (const k in e.it) v += (S.PRICE.it[k] || 0) * e.it[k];
@@ -546,7 +549,7 @@ class Room {
     if (a) {
       a.stats.games++; a.stats.kills += e.kills; a.xp = (a.xp || 0) + xp; ACC.touchRank();
       if (res === 'win') a.stats.wins++;
-      if (res === 'extract' && this.world) { a.stats.ext++; a.stats.val += e.val; a.money += e.val; saved = lootOf(e); const eq = ACC.equipFromRaid(a, saved); saved = eq.kept; stored = eq.stored; }
+      if (res === 'extract' && this.world) { a.stats.ext++; a.stats.val += e.val; saved = lootOf(e); const eq = ACC.equipFromRaid(a, saved); saved = eq.kept; stored = eq.stored; }
       ACC.persist(a);
     }
     const c = clients.get(e.cid); if (!c) return;
@@ -757,7 +760,7 @@ class Room {
       }
       const w = e.w;
       const me = { id: e.id, x: r2(e.x), y: r2(e.y), f: e.f, a: r2(e.a), hp: Math.round(e.hp), ar: e.arL, ad: Math.round(e.arD), st: e.st, cw: e.cw,
-        w: w.map(x => x && { id: x.id, n: x.st.n, mag: x.mag, max: x.st.mag, am: x.st.am, att: x.att, c: x.st.c, auto: x.st.auto, sc: x.st.scope ? 1 : 0, sil: x.st.sil, dmg: Math.round(x.st.dmg * x.st.pel), iv: Math.round(x.st.iv), rng: Math.round(x.st.rng), rc: r2(x.st.rc), mv: r2(x.st.mv), sp: r2(x.st.sp), spd: Math.round(x.st.spd) }),
+        w: w.map(x => x && { id: x.id, inf: INF(x) ? 1 : 0, free: x.free ? 1 : 0, n: x.st.n, mag: x.mag, max: x.st.mag, am: x.st.am, att: x.att, c: x.st.c, auto: x.st.auto, sc: x.st.scope ? 1 : 0, sil: x.st.sil, dmg: Math.round(x.st.dmg * x.st.pel), iv: Math.round(x.st.iv), rng: Math.round(x.st.rng), rc: r2(x.st.rc), mv: r2(x.st.mv), sp: r2(x.st.sp), spd: Math.round(x.st.spd) }),
         am: e.am, it: e.it, bag: e.bag, val: e.val, rec: r2(e.rec), sp: this.spMul(e, now), rl: e.rlOn && w[e.cw] ? r2(1 - (e.rlEnd - now) / w[e.cw].st.rl) : -1,
         act: e.act ? [e.act.k, r2(1 - (e.act.end - now) / e.act.dur)] : null, rcd: Math.max(0, Math.round(e.rollCd - now)), rol: now < e.rollUntil ? 1 : 0, aim: e.ad ? 1 : 0, car: e.car, fl: Math.max(0, Math.round(e.flash - now)), kills: e.kills, ex: r2(e.exT), spec: v !== e ? v.id : null, vx: r1(v.x), vy: r1(v.y), vf: v.f, va: r2(v.a), xp: this.calcXP(e) };
       const msg = { t: 's', tm: Math.round(now / 1000), pre: this.pre > 0 ? Math.ceil(this.pre / 1000) : 0, peace, me, ps, bl, gr, sm, vh, z: zs, dr: drs, n: aliveN, ev: evs, exo: this.exOpen ? 1 : 0, tl: this.world && e.raidEnd ? Math.max(0, Math.round((e.raidEnd - now) / 1000)) : null };
@@ -878,11 +881,14 @@ function applyKit(e, kit) {
 }
 function lootOf(e) {
   const out = [];
-  for (const w of e.w) if (w) { e.am[w.st.am] = (e.am[w.st.am] || 0) + w.mag; out.push({ k: 'w', w: wSer(w) }); }
+  for (const w of e.w) if (w && !w.free) { if (!INF(w)) e.am[w.st.am] = (e.am[w.st.am] || 0) + w.mag; out.push({ k: 'w', w: wSer(w) }); }
   if (e.arL && e.arD > 5) out.push({ k: 'ar', d: e.arL, n: Math.round(e.arD) });
   for (const k in e.am) if (e.am[k] > 0) out.push({ k: 'am', d: k, n: e.am[k] });
   for (const k in e.it) if (e.it[k] > 0) out.push({ k, n: e.it[k] });
   for (const a of e.bag) out.push({ k: 'att', d: a });
+  const vi = e.valItems || [], rest = (e.val || 0) - vi.reduce((a, b) => a + b.n, 0);
+  for (const it of vi) out.push(it);
+  if (rest > 0) out.push({ k: 'val', d: Math.max(0, S.VALUABLES.findIndex(x => x[1] >= rest)), n: rest });
   return out;
 }
 let nextCid = 1;
