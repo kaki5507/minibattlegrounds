@@ -62,7 +62,7 @@ function register(name, pw) {
   if (String(pw || '').length < 4 || String(pw).length > 32) return { err: '비밀번호는 4~32자로 입력하세요' };
   if (isTaken(name)) return { err: '이미 사용 중인 닉네임입니다' };
   const salt = crypto.randomBytes(16).toString('hex');
-  const a = { name, salt, hash: hashPw(pw, salt), created: Date.now(), stats: { wins: 0, ext: 0, kills: 0, games: 0, val: 0 }, money: 3000, stash: STARTER(), kit: [], skin: S.cleanSkin({}), tokens: [] };
+  const a = { name, salt, hash: hashPw(pw, salt), created: Date.now(), xp: 0, stats: { wins: 0, ext: 0, kills: 0, games: 0, val: 0 }, money: 3000, stash: STARTER(), kit: [], skin: S.cleanSkin({}), tokens: [] };
   accounts.set(keyOf(name), a);
   const token = newToken(a); persist(a);
   return { acc: a, token };
@@ -79,7 +79,7 @@ function byToken(t) { const k = tokens.get(sha(String(t || ''))); return k ? acc
 function logout(a, t) { if (!a) return; const h = sha(String(t || '')); a.tokens = (a.tokens || []).filter(x => x !== h); tokens.delete(h); persist(a); }
 
 // 공개용 계정 정보 (비밀번호/토큰 제외)
-function view(a) { return { name: a.name, stats: a.stats, money: a.money, stash: a.stash, kit: a.kit, skin: a.skin, max: STASH_MAX }; }
+function view(a) { return { name: a.name, xp: a.xp || 0, stats: a.stats, money: a.money, stash: a.stash, kit: a.kit, skin: a.skin, max: STASH_MAX }; }
 
 // ───── 창고 조작 ─────
 const STACK = { am: 1, med: 1, band: 1, gren: 1, flash: 1, smoke: 1, fuel: 1 };
