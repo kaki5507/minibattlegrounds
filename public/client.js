@@ -566,8 +566,10 @@ const keys = {}; let mouse = { x: 0, y: 0, down: false, rdown: false, on: false 
 const sticks = { move: null, aim: null };
 let lastAim = 0;
 const fireTouch = new Map(); // 발사 버튼 터치 (id -> {el, ox, oy})
-function resize() { DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; layoutBtns(); }
-addEventListener('resize', resize);
+let SAFE = { t: 0, r: 0, b: 0, l: 0 };
+function readSafe() { const cs = getComputedStyle($('safe')); SAFE = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 }; }
+function resize() { readSafe(); DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; layoutBtns(); }
+addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 300));
 const STICK_R = 58;
 function inMini(x, y) { const m = miniRect(); return x > m.x && x < m.x + m.s && y > m.y && y < m.y + m.s; }
 cv.addEventListener('touchstart', e => {
@@ -693,7 +695,7 @@ function renderMini(M) {
   x.fillStyle = '#e2a03f'; for (const t of M.entries || []) { x.save(); x.translate(t.x * k, t.y * k); x.rotate(.785); x.fillRect(-3, -3, 6, 6); x.restore(); }
   return c;
 }
-function miniRect() { const s = Math.min(160, Math.max(104, Math.min(W, H) * .26)); return { x: 10, y: 10, s }; }
+function miniRect() { const s = Math.min(160, Math.max(96, Math.min(W, H) * .25)); return { x: 10 + SAFE.l, y: 10 + SAFE.t, s }; }
 function openMap() {
   if (!G || !G.M) return;
   const M = G.M, c = $('bmc'), s = Math.min(innerWidth, innerHeight) * .94 * DPR; c.width = c.height = s; c.style.width = c.style.height = (s / DPR) + 'px';
@@ -944,17 +946,18 @@ function drawHUD(now, vx, vy, sc, camx, camy) {
   if (G.tl != null) chips.push(['남은 시간', `${Math.floor(G.tl / 60)}:${String(G.tl % 60).padStart(2, '0')}`]);
   if (me.f > 0) chips.push(['층', (me.f + 1) + 'F']);
   if (G.world) chips.push(['전리품', me.val]);
-  ctx.font = `700 13px ${FONT}`; let cx = W - 10;
-  for (let i = chips.length - 1; i >= 0; i--) { const [l, v] = chips[i]; ctx.font = `500 11px ${FONT}`; const lw = ctx.measureText(l).width; ctx.font = `800 14px ${FONT}`; const vw = ctx.measureText(String(v)).width; const w = lw + vw + 22; cx -= w; pill(cx, 10, w, 26, 'rgba(10,12,14,.72)', 'rgba(255,255,255,.1)'); ctx.textAlign = 'left'; ctx.font = `500 11px ${FONT}`; ctx.fillStyle = '#8b959e'; ctx.fillText(l, cx + 9, 27); ctx.font = `800 14px ${FONT}`; ctx.fillStyle = l === '남은 시간' && G.tl < 120 ? '#ff6b5a' : '#e6e9ec'; ctx.fillText(String(v), cx + 13 + lw, 28); cx -= 6; }
+  const ty = 10 + SAFE.t, cf = isTouch && W < 900 ? 10 : 11, vf2 = isTouch && W < 900 ? 13 : 14; let cx = W - 10 - SAFE.r;
+  for (let i = chips.length - 1; i >= 0; i--) { const [l, v] = chips[i]; ctx.font = `500 ${cf}px ${FONT}`; const lw = ctx.measureText(l).width; ctx.font = `800 ${vf2}px ${FONT}`; const vw = ctx.measureText(String(v)).width; const w = lw + vw + 20; cx -= w; pill(cx, ty, w, 26, 'rgba(10,12,14,.72)', 'rgba(255,255,255,.1)'); ctx.textAlign = 'left'; ctx.font = `500 ${cf}px ${FONT}`; ctx.fillStyle = '#8b959e'; ctx.fillText(l, cx + 8, ty + 17); ctx.font = `800 ${vf2}px ${FONT}`; ctx.fillStyle = l === '남은 시간' && G.tl < 120 ? '#ff6b5a' : '#e6e9ec'; ctx.fillText(String(v), cx + 12 + lw, ty + 18); cx -= 5; }
   // 킬피드
   G.feed = G.feed.filter(f => f.until > now); ctx.textAlign = 'right';
-  G.feed.forEach((f, i) => { const y = 54 + i * 20; ctx.font = `600 12px ${FONT}`; const txt = `${f.a}  ${f.down ? '기절' : '▸'}  ${f.b}`; const w = ctx.measureText(txt).width + 16; pill(W - 10 - w, y - 13, w, 18, f.mine ? 'rgba(226,160,63,.25)' : f.me ? 'rgba(200,60,50,.3)' : 'rgba(10,12,14,.55)'); ctx.fillStyle = f.mine ? '#f0c27a' : '#e6e9ec'; ctx.fillText(txt, W - 18, y); });
+  const fy0 = (isTouch ? 104 : 54) + SAFE.t;
+  G.feed.forEach((f, i) => { const y = fy0 + i * 20; ctx.font = `600 12px ${FONT}`; const txt = `${f.a}  ${f.down ? '기절' : '▸'}  ${f.b}`; const w = ctx.measureText(txt).width + 16; pill(W - 10 - SAFE.r - w, y - 13, w, 18, f.mine ? 'rgba(226,160,63,.25)' : f.me ? 'rgba(200,60,50,.3)' : 'rgba(10,12,14,.55)'); ctx.fillStyle = f.mine ? '#f0c27a' : '#e6e9ec'; ctx.fillText(txt, W - 18 - SAFE.r, y); });
   // 메시지
   G.msgs = G.msgs.filter(m => m.until > now);
   ctx.textAlign = 'center';
   G.msgs.slice(-4).forEach((m, i) => { ctx.font = `${m.small ? 600 : 700} ${m.small ? 13 : 15}px ${FONT}`; const w = ctx.measureText(m.t).width + 24, y = H * .2 + i * 30; pill(W / 2 - w / 2, y - 17, w, 24, m.small ? 'rgba(20,40,28,.7)' : 'rgba(10,12,14,.75)', m.small ? 'rgba(94,224,138,.3)' : 'rgba(226,160,63,.35)'); ctx.fillStyle = m.small ? '#a6e8bb' : '#f0d8a8'; ctx.fillText(m.t, W / 2, y); });
   if (G.pre > 0) { ctx.font = `900 56px ${FONT}`; ctx.fillStyle = '#e2a03f'; ctx.fillText(`${G.pre}`, W / 2, H * .42); ctx.font = `600 15px ${FONT}`; ctx.fillStyle = '#e6e9ec'; ctx.fillText('곧 시작합니다 · 시작 후 60초 동안은 교전 금지', W / 2, H * .42 + 32); }
-  if (G.peace > 0 && G.pre <= 0) { const w = 210; pill(W / 2 - w / 2, 46, w, 30, 'rgba(10,12,14,.78)', 'rgba(94,224,138,.45)'); ctx.font = `600 11px ${FONT}`; ctx.fillStyle = '#8be0a6'; ctx.textAlign = 'center'; ctx.fillText('교전 금지', W / 2 - 40, 66); ctx.font = `800 16px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText(`0:${String(G.peace).padStart(2, '0')}`, W / 2 + 34, 67); }
+  if (G.peace > 0 && G.pre <= 0) { const w = 210, py = SAFE.t; ctx.save(); ctx.translate(0, py); pill(W / 2 - w / 2, 46, w, 30, 'rgba(10,12,14,.78)', 'rgba(94,224,138,.45)'); ctx.font = `600 11px ${FONT}`; ctx.fillStyle = '#8be0a6'; ctx.textAlign = 'center'; ctx.fillText('교전 금지', W / 2 - 40, 66); ctx.font = `800 16px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText(`0:${String(G.peace).padStart(2, '0')}`, W / 2 + 34, 67); ctx.restore(); }
   // 하단 상태 패널
   const compact = isTouch && H < 520, bw = compact ? Math.min(250, W * .3) : Math.min(320, W * .38), bx = W / 2 - bw / 2 - (compact ? W * .04 : 0), by = H - (compact ? 14 : 26);
   pill(bx - 10, by - (compact ? 50 : 58), bw + 20, compact ? 62 : 76, 'rgba(10,12,14,.7)', 'rgba(255,255,255,.08)');
