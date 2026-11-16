@@ -10,7 +10,7 @@ let save = { name: '', wins: 0, ext: 0, kills: 0, games: 0, val: 0, sel: {} };
 try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) {}
 save.sel = S.cleanSkin(save.sel);
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
-if (!save.name) save.name = '오리' + Math.floor(100 + Math.random() * 900);
+if (!save.name) save.name = '플레이어' + Math.floor(100 + Math.random() * 900);
 
 // ───────── 확대(더블탭/핀치) 방지 ─────────
 let lastTouchEnd = 0;
@@ -21,88 +21,223 @@ document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, 
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 // ───────── 네트워크 ─────────
-let ws, myCid = null, curRoom = null;
+let ws, myCid = null, curRoom = null, acct = null, pendingJoin = null, myName = null;
+const TOKEN_KEY = 'mbg_token';
+const getTok = () => { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } };
+const setTok = t => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} };
+function setConn(t, cls) { const c = $('conn'); c.textContent = t; c.className = cls || ''; }
 function connect() {
+  setConn('CONNECTING');
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { $('conn').textContent = '🟢 연결됨'; hello(); };
-  ws.onclose = () => { $('conn').textContent = '🔴 연결 끊김 - 재연결중'; setTimeout(connect, 2000); if (G) { G = null; show('menu'); } };
+  ws.onopen = () => { setConn('ONLINE', 'ok'); const t = getTok(); if (t) sendM({ t: 'auth', token: t }); hello(); };
+  ws.onclose = () => { setConn('RECONNECTING', 'bad'); setTimeout(connect, 2000); if (G) { G = null; show('menu'); } };
   ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } onMsg(m); };
 }
 const sendM = m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
-function hello() { sendM({ t: 'hello', name: save.name, skin: save.sel }); }
+function hello() { sendM({ t: 'hello', name: acct ? acct.name : save.name, skin: save.sel }); }
+// 로그인 상태면 서버 전적, 아니면 이 기기 전적
+const prog = () => acct ? { wins: acct.stats.wins, ext: acct.stats.ext, kills: acct.stats.kills, games: acct.stats.games, val: acct.stats.val } : save;
 
-function show(id) { $('conn').style.display = id === 'game' ? 'none' : ''; for (const s of ['menu', 'room']) $(s).classList.toggle('on', s === id); $('game').classList.toggle('on', id === 'game'); }
+function show(id) { $('conn').style.display = id === 'game' ? 'none' : ''; for (const s of ['menu', 'room']) $(s).classList.toggle('on', s === id); $('game').classList.toggle('on', id === 'game'); $('bgc').style.display = id === 'game' ? 'none' : ''; }
 
 function onMsg(m) {
   switch (m.t) {
     case 'hi': myCid = m.id; renderRooms(m.rooms); break;
     case 'rooms': renderRooms(m.rooms); break;
-    case 'room': curRoom = m; if (!G) { show('room'); renderRoom(); } break;
+    case 'room': curRoom = m; if (!G) { if (!$('room').classList.contains('on')) closeModal('pwm'); show('room'); renderRoom(); } break;
     case 'left': curRoom = null; G = null; show('menu'); break;
     case 'lobby': G = null; closeModals(); show('room'); if (curRoom) renderRoom(); break;
-    case 'err': toast(m.txt); break;
+    case 'err': if (m.code === 'pw') return askPw(m.id, m.txt); toast(m.txt); break;
     case 'msg': toast(m.txt); break;
+    case 'nametaken': myName = m.name; toast(m.txt); break;
+    case 'acct': acct = m.acc; if (m.token) setTok(m.token); if (acct.skin) { save.sel = S.cleanSkin(acct.skin); } closeModal('authm'); updStats(); if ($('stashm').classList.contains('on')) renderStash(); break;
+    case 'autherr': { const e = $('aErr'); e.textContent = m.txt; $('authBox').classList.remove('shake'); void $('authBox').offsetWidth; $('authBox').classList.add('shake'); break; }
+    case 'logout': acct = null; setTok(null); updStats(); closeModal('stashm'); if (m.txt) toast(m.txt); hello(); break;
     case 'start': startGame(m); break;
     case 's': if (G) onSnap(m); break;
     case 'result': onResult(m); break;
   }
 }
-let toastEl;
-function toast(t) { if (G) { G.msgs.push({ t, until: performance.now() + 4000 }); return; } if (!toastEl) { toastEl = document.createElement('div'); toastEl.style.cssText = 'position:fixed;top:40px;left:50%;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:10px;z-index:50;font-weight:700'; document.body.appendChild(toastEl); } toastEl.textContent = t; toastEl.style.display = 'block'; clearTimeout(toastEl.tm); toastEl.tm = setTimeout(() => toastEl.style.display = 'none', 3000); }
+function toast(t) { if (G) { G.msgs.push({ t, until: performance.now() + 4000 }); return; } const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(el.tm); el.tm = setTimeout(() => el.style.display = 'none', 3200); }
+const closeModal = id => $(id).classList.remove('on');
 
 // ───────── 메뉴 ─────────
 $('nm').value = save.name;
 $('nm').onchange = () => { save.name = $('nm').value.trim().slice(0, 12) || save.name; persist(); hello(); };
+const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 $('qBR').onclick = () => { hello(); sendM({ t: 'quick', mode: 'br' }); };
-$('qEX').onclick = () => { hello(); sendM({ t: 'quick', mode: 'ex' }); };
-$('mk').onclick = () => { hello(); sendM({ t: 'create', name: $('rname').value || (save.name + '의 방'), mode: $('rmode').value, ts: $('rts').value }); };
+$('qEX').onclick = () => { hello(); if (!acct) toast('로그인하면 탈출에 성공한 아이템이 창고에 저장됩니다'); sendM({ t: 'quick', mode: 'ex' }); };
+$('mk').onclick = () => { hello(); sendM({ t: 'create', name: $('rname').value.trim() || ((acct ? acct.name : save.name) + '의 방'), mode: radio('rmode'), ts: radio('rts'), pw: $('rpw').value }); };
 $('startBtn').onclick = () => sendM({ t: 'start' });
 $('leaveBtn').onclick = () => sendM({ t: 'leave' });
 $('shopBtn').onclick = openShop;
-function updStats() { $('stats').innerHTML = `<b>${esc(save.name)}</b><br>🏆 1등 ${save.wins}회 · 🚁 탈출 ${save.ext}회<br>💀 킬 ${save.kills} · 🎮 ${save.games}판<br>💰 누적 전리품 ${save.val.toLocaleString()}`; }
+document.querySelectorAll('[data-eye]').forEach(b => b.onclick = () => { const i = $(b.dataset.eye); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? '숨김' : '보기'; });
+// 방 비밀번호 입력
+function askPw(id, msg) {
+  pendingJoin = id; const r = lastRooms.find(x => x.id === id);
+  $('pwTitle').textContent = r ? r.name : '비밀번호 입력';
+  const open = $('pwm').classList.contains('on');
+  $('pwErr').textContent = open ? msg : ''; $('pwm').classList.add('on');
+  if (open) { $('pwBox').classList.remove('shake'); void $('pwBox').offsetWidth; $('pwBox').classList.add('shake'); $('pwIn').select(); }
+  else { $('pwIn').value = ''; setTimeout(() => $('pwIn').focus(), 50); }
+}
+$('pwOk').onclick = () => { if (pendingJoin == null) return; hello(); sendM({ t: 'join', id: pendingJoin, pw: $('pwIn').value }); };
+$('pwIn').onkeydown = e => { if (e.key === 'Enter') $('pwOk').onclick(); };
+$('pwCancel').onclick = () => { pendingJoin = null; closeModal('pwm'); };
+// 계정
+function openAuth(mode) { const r = document.querySelector(`input[name=amode][value=${mode || 'login'}]`); r.checked = true; authMode(); $('aErr').textContent = ''; $('aPw').value = ''; $('aPw2').value = ''; if (!$('aName').value) $('aName').value = save.name.startsWith('손님') ? '' : save.name; $('authm').classList.add('on'); setTimeout(() => ($('aName').value ? $('aPw') : $('aName')).focus(), 50); }
+function authMode() { const reg = radio('amode') === 'register'; $('aPw2Row').style.display = reg ? '' : 'none'; $('aOk').textContent = reg ? '가입하고 시작' : '로그인'; $('aPw').autocomplete = reg ? 'new-password' : 'current-password'; $('aErr').textContent = ''; }
+document.querySelectorAll('input[name=amode]').forEach(r => r.onchange = authMode);
+$('aCancel').onclick = () => closeModal('authm');
+$('aOk').onclick = () => {
+  const reg = radio('amode') === 'register', name = $('aName').value.trim(), pw = $('aPw').value;
+  if (name.length < 2) return ($('aErr').textContent = '닉네임을 2자 이상 입력하세요');
+  if (pw.length < 4) return ($('aErr').textContent = '비밀번호를 4자 이상 입력하세요');
+  if (reg && pw !== $('aPw2').value) return ($('aErr').textContent = '비밀번호 확인이 일치하지 않습니다');
+  if (reg) save.sel = S.cleanSkin(save.sel);
+  sendM({ t: reg ? 'register' : 'login', name, pw });
+};
+['aName', 'aPw', 'aPw2'].forEach(id => $(id).onkeydown = e => { if (e.key === 'Enter') $('aOk').onclick(); });
+function updStats() {
+  const P = prog();
+  $('stats').innerHTML = [['1등', P.wins], ['탈출', P.ext], ['킬', P.kills], ['판', P.games]].map(([k, v]) => `<div><b>${v}</b><small>${k}</small></div>`).join('');
+  const bar = $('acctBar');
+  if (acct) {
+    $('nm').style.display = 'none'; $('nmLocked').className = 'nmlock on'; $('nmLocked').innerHTML = `${esc(acct.name)}<i>VERIFIED</i>`;
+    bar.innerHTML = `<div class="money">${acct.money.toLocaleString()}<small>원</small></div><button class="y" id="stashBtn">창고 · 상인</button><button class="g" id="logoutBtn">로그아웃</button>`;
+    $('stashBtn').onclick = openStash; $('logoutBtn').onclick = () => sendM({ t: 'logout', token: getTok() });
+  } else {
+    $('nm').style.display = ''; $('nmLocked').className = 'nmlock';
+    bar.innerHTML = `<div class="guest">손님으로 플레이 중<br>기록·창고는 이 기기에만 남습니다</div><button class="y" id="loginBtn">로그인</button><button class="g" id="regBtn">회원가입</button>`;
+    $('loginBtn').onclick = () => openAuth('login'); $('regBtn').onclick = () => openAuth('register');
+  }
+}
 updStats();
 const MODEN = { br: '배틀로얄', ex: '탈출' }, TSN = { 1: '솔로', 2: '듀오', 4: '스쿼드' };
+let lastRooms = [];
 function renderRooms(list) {
-  const el = $('roomList');
-  if (!list.length) { el.innerHTML = '<div style="opacity:.6;padding:10px">방이 없습니다. 빠른 입장 또는 방을 만들어 보세요!</div>'; return; }
-  el.innerHTML = list.map(r => `<div class="ri"><span>${esc(r.name)}<span class="tag">${MODEN[r.mode]}</span><span class="tag">${TSN[r.ts]}</span></span><span>${r.n}/10 ${r.st === 'play' ? '<span class="tag">진행중</span>' : `<button data-j="${r.id}">입장</button>`}</span></div>`).join('');
-  el.querySelectorAll('[data-j]').forEach(b => b.onclick = () => { hello(); sendM({ t: 'join', id: +b.dataset.j }); });
+  lastRooms = list; const el = $('roomList');
+  if (!list.length) { el.innerHTML = '<div class="empty">열린 방이 없습니다.<br>빠른 입장을 누르거나 방을 직접 만들어 보세요.</div>'; return; }
+  el.innerHTML = list.map(r => `<div class="ri"><div style="min-width:0"><div class="nm">${r.lk ? '<span class="lock"></span>' : ''}${esc(r.name)}</div><div class="sub">${MODEN[r.mode]} · ${TSN[r.ts]}${r.lk ? ' · 비공개' : ''}</div></div>
+    <div class="cnt">${r.n}<i>/10</i></div>${r.st === 'play' ? '<span class="tag live">진행중</span>' : `<button class="${r.lk ? 'g' : ''}" data-j="${r.id}" data-lk="${r.lk}">입장</button>`}</div>`).join('');
+  el.querySelectorAll('[data-j]').forEach(b => b.onclick = () => { hello(); if (+b.dataset.lk) askPw(+b.dataset.j, ''); else sendM({ t: 'join', id: +b.dataset.j }); });
 }
 function renderRoom() {
   const r = curRoom; if (!r) return;
-  $('rtitle').textContent = r.name;
-  $('rinfo').textContent = `${MODEN[r.mode]} · ${TSN[r.ts]} · ${r.players.length}/10명`;
-  $('cd').textContent = r.st === 'play' ? '게임 진행중…' : r.cd != null ? `⏱ ${Math.ceil(r.cd / 1000)}초 후 시작` : r.players.length < 5 ? `대기중… (${5 - r.players.length}명 더 필요)` : '';
-  $('plist').innerHTML = r.players.map(p => `<div class="ri"><span>${r.host === p.id ? '👑' : '🦆'} ${esc(p.name)} <small style="opacity:.6">${S.BODIES[p.skin.body] ? S.BODIES[p.skin.body].n : ''}</small></span>${p.id === myCid ? '<span class="tag">나</span>' : ''}</div>`).join('');
+  $('rtitle').innerHTML = `${r.lk ? '<span class="lock" style="display:inline-block;width:16px;height:20px;background:var(--acc);-webkit-mask:var(--lockm);mask:var(--lockm)"></span>' : ''}${esc(r.name)}`;
+  $('rinfo').textContent = `${MODEN[r.mode]} · ${TSN[r.ts]} · ${r.players.length}/10명${r.lk ? ' · 비공개방' : ''}`;
+  const cd = $('cd'); cd.className = r.cd != null ? 'hot' : '';
+  cd.textContent = r.st === 'play' ? '게임 진행 중' : r.cd != null ? `${Math.ceil(r.cd / 1000)}초 후 시작` : r.players.length < 5 ? `대기 중 · ${5 - r.players.length}명 더 필요` : '곧 시작';
+  $('slots').innerHTML = Array.from({ length: 10 }, (_, i) => `<i class="${i < r.players.length ? 'on' : ''}"></i>`).join('');
+  $('plist').innerHTML = r.players.map((p, i) => `<div class="ri"><div class="av ${r.host === p.id ? 'host' : ''}">${i + 1}</div><div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="sub">${S.BODIES[p.skin.body] ? S.BODIES[p.skin.body].n : ''}</div></div><div>${r.host === p.id ? '<span class="tag acc">방장</span>' : ''}${p.id === myCid ? '<span class="tag">나</span>' : ''}</div></div>`).join('');
   const isHost = r.host === myCid;
   $('startBtn').style.display = isHost ? '' : 'none';
-  $('startBtn').textContent = r.players.length >= 5 ? '▶ 지금 시작' : '🤖 봇 채우고 시작';
+  $('startBtn').textContent = r.players.length >= 5 ? '지금 시작' : '봇 채우고 시작';
 }
 setInterval(() => { if (curRoom && curRoom.cd != null && !G) { curRoom.cd = Math.max(0, curRoom.cd - 250); renderRoom(); } }, 250);
+
+// ───────── 창고 · 상인 ─────────
+let stTab = 'stash', stOpen = null;
+const ICOL = { w: '#c9a24a', ar: '#4a8fc9', am: '#8a9aa6', att: '#7aa36a', val: '#d4b14a', med: '#c94a3b', band: '#c97a6b', gren: '#6b8f4a', flash: '#d8d8d8', smoke: '#8c959e', fuel: '#c98a3b' };
+function itemSub(it) {
+  if (it.k === 'w') { const w = it.w || {}; const st = S.stats({ id: w.id, att: w.att || {}, base: w.base || null }); const at = Object.values(w.att || {}).map(a => S.ATT[a] ? S.ATT[a].n : a); return `피해 ${Math.round(st.dmg * st.pel)} · ${S.AMMO[st.am]}${at.length ? ' · ' + at.join(', ') : ''}`; }
+  if (it.k === 'ar') return `내구도 ${Math.round(it.n)} / ${S.ARMOR[it.d].dur}`;
+  if (it.k === 'att') return S.ATT[it.d] ? S.ATT[it.d].d : '';
+  return `${it.n}개`;
+}
+function itemCard(it, i, from, acts) {
+  const key = from + ':' + i;
+  return `<div class="itm ${stOpen === key ? 'open' : ''}" style="--c:${ICOL[it.k] || '#3a444e'}" data-it="${key}"><span class="pr">${S.itemPrice(it).toLocaleString()}</span><b>${esc(S.itemName(it))}</b><small>${esc(itemSub(it))}</small><div class="act">${acts}</div></div>`;
+}
+function openStash() { if (!acct) return openAuth('login'); stOpen = null; renderStash(); $('stashm').classList.add('on'); }
+function renderStash() {
+  if (!acct) return;
+  const A = acct, kitW = A.kit.filter(x => x.k === 'w').length, kitA = A.kit.filter(x => x.k === 'ar').length;
+  const kitVal = A.kit.reduce((s, it) => s + S.itemPrice(it), 0);
+  let left;
+  if (stTab === 'stash') {
+    left = `<div class="lbl"><span>창고 ${A.stash.length} / ${A.max}</span><span>누르면 메뉴</span></div><div class="items">${A.stash.map((it, i) => itemCard(it, i, 'stash', `${it.k !== 'val' ? '<button class="y" data-op="kit">반입</button>' : ''}<button class="g" data-op="sell">판매 ${Math.floor(S.itemPrice(it) * .5).toLocaleString()}</button>`)).join('') || '<div class="empty">창고가 비었습니다. 상인에게 사거나 탈출에 성공해 채우세요.</div>'}</div>`;
+  } else {
+    const cats = {}; S.SHOP.forEach(p => (cats[p.cat] = cats[p.cat] || []).push(p));
+    left = `<div class="lbl"><span>상인</span><span>구매한 물건은 창고로</span></div>${Object.entries(cats).map(([c, ps]) => `<div class="ccat">${c}</div><div class="items">${ps.map(p => `<div class="itm" style="--c:${ICOL[p.item.k]}" data-buy="${p.id}"><span class="pr" style="color:${A.money >= p.price ? 'var(--acc)' : 'var(--red)'}">${p.price.toLocaleString()}</span><b>${esc(S.itemName(p.item))}</b><small>${esc(itemSub(p.item))}</small></div>`).join('')}</div>`).join('')}`;
+  }
+  $('stashBox').innerHTML = `<div class="sthead"><h3>창고</h3><div class="segs" style="width:220px"><label class="seg"><input type="radio" name="sttab" value="stash" ${stTab === 'stash' ? 'checked' : ''}><span>내 창고</span></label><label class="seg"><input type="radio" name="sttab" value="shop" ${stTab === 'shop' ? 'checked' : ''}><span>상인</span></label></div><div class="money">${A.money.toLocaleString()}원</div><button class="g" id="stX">닫기</button></div>
+  <div class="stgrid"><div class="stcol">${left}</div>
+  <div class="stcol"><div class="lbl"><span>레이드 반입 장비</span><span>${kitVal.toLocaleString()}</span></div>
+    <div class="items">${A.kit.map((it, i) => itemCard(it, i, 'kit', '<button class="g" data-op="unkit">창고로</button>')).join('') || '<div class="empty" style="padding:20px 6px">반입할 장비가 없습니다.<br>창고에서 아이템을 눌러 반입하세요.</div>'}</div>
+    <div class="kitnote">무기 ${kitW}/2 · 방어구 ${kitA}/1<br>탈출 모드에 들어가면 이 장비를 들고 시작합니다. <b style="color:var(--tx2)">탈출하면</b> 들고 나온 모든 것이 창고에 들어가고 귀중품은 돈이 됩니다. <b style="color:#e08a7f">죽거나 시간 초과면</b> 반입한 장비를 모두 잃습니다.</div>
+  </div></div>`;
+  $('stX').onclick = () => closeModal('stashm');
+  document.querySelectorAll('input[name=sttab]').forEach(r => r.onchange = () => { stTab = r.value; stOpen = null; renderStash(); });
+  $('stashBox').querySelectorAll('[data-it]').forEach(d => d.onclick = e => {
+    const op = e.target.dataset && e.target.dataset.op, [from, i] = d.dataset.it.split(':');
+    if (op === 'kit') sendM({ t: 'stash', op: 'kit', i: +i });
+    else if (op === 'unkit') sendM({ t: 'stash', op: 'unkit', i: +i });
+    else if (op === 'sell') sendM({ t: 'stash', op: 'sell', i: +i, from });
+    else { stOpen = stOpen === d.dataset.it ? null : d.dataset.it; renderStash(); return; }
+    stOpen = null;
+  });
+  $('stashBox').querySelectorAll('[data-buy]').forEach(d => d.onclick = () => sendM({ t: 'stash', op: 'buy', id: d.dataset.buy }));
+}
+
+// ───────── 메뉴 배경 (어두운 섬 + 줄어드는 자기장) ─────────
+const bgc = $('bgc'), bgx = bgc.getContext('2d'); let bgMap = null;
+fetch('/map/br').then(r => r.json()).then(o => {
+  const M = S.hydrate(o), sz = 1400, c = document.createElement('canvas'); c.width = c.height = sz; const x = c.getContext('2d'), k = sz / S.W;
+  x.fillStyle = '#07090b'; x.fillRect(0, 0, sz, sz);
+  x.fillStyle = '#11161a'; x.beginPath(); x.arc(S.CX * k, S.CY * k, S.ISLAND * k, 0, 6.283); x.fill();
+  x.fillStyle = '#0a0e12'; for (const l of M.lakes) { x.beginPath(); x.arc(l.x * k, l.y * k, l.r * k, 0, 6.283); x.fill(); }
+  x.fillStyle = '#151c19'; for (const t of M.circles) if (t.t === 'tree') { x.beginPath(); x.arc(t.x * k, t.y * k, 2.2, 0, 6.283); x.fill(); }
+  x.strokeStyle = '#1e2429'; x.lineWidth = 3; for (const r of M.roads) { x.beginPath(); x.moveTo(r[0] * k, r[1] * k); x.lineTo(r[2] * k, r[3] * k); x.stroke(); }
+  x.fillStyle = '#232a30'; for (const b of M.blds) x.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
+  x.strokeStyle = 'rgba(255,255,255,.025)'; x.lineWidth = 1; for (let i = 0; i < sz; i += 70) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, sz); x.moveTo(0, i); x.lineTo(sz, i); x.stroke(); }
+  bgMap = c;
+}).catch(() => {});
+function drawBg(now) {
+  const w = innerWidth, h = innerHeight, d = Math.min(2, devicePixelRatio || 1);
+  if (bgc.width !== w * d) { bgc.width = w * d; bgc.height = h * d; }
+  bgx.setTransform(d, 0, 0, d, 0, 0); bgx.fillStyle = '#07090b'; bgx.fillRect(0, 0, w, h);
+  const t = now / 1000, S2 = Math.max(w, h) * 1.5;
+  const ox = w * .62 - S2 / 2 + Math.sin(t * .03) * 60, oy = h * .5 - S2 / 2 + Math.cos(t * .025) * 40;
+  if (bgMap) { bgx.globalAlpha = .9; bgx.drawImage(bgMap, ox, oy, S2, S2); bgx.globalAlpha = 1; }
+  // 자기장 (30초 주기로 줄어듦)
+  const ph = (t % 30) / 30, R = S2 * (.42 - ph * .3), cx = ox + S2 * .52, cy = oy + S2 * .48;
+  bgx.save(); bgx.beginPath(); bgx.rect(0, 0, w, h); bgx.arc(cx, cy, R, 0, 6.283, true); bgx.fillStyle = 'rgba(40,70,120,.10)'; bgx.fill(); bgx.restore();
+  bgx.strokeStyle = 'rgba(110,160,220,.35)'; bgx.lineWidth = 1.5; bgx.beginPath(); bgx.arc(cx, cy, R, 0, 6.283); bgx.stroke();
+  bgx.strokeStyle = 'rgba(226,160,63,.25)'; bgx.setLineDash([6, 8]); bgx.beginPath(); bgx.arc(cx + S2 * .03, cy - S2 * .02, S2 * .12, 0, 6.283); bgx.stroke(); bgx.setLineDash([]);
+  // 보급기 경로
+  const pp = (t % 18) / 18, px = -100 + (w + 200) * pp, py = h * .22 + pp * h * .2;
+  bgx.strokeStyle = 'rgba(255,255,255,.06)'; bgx.beginPath(); bgx.moveTo(-100, h * .22); bgx.lineTo(px, py); bgx.stroke();
+  bgx.fillStyle = 'rgba(226,160,63,.7)'; bgx.beginPath(); bgx.arc(px, py, 2.5, 0, 6.283); bgx.fill();
+  // 비네트
+  const g = bgx.createRadialGradient(w * .55, h * .5, Math.min(w, h) * .2, w * .5, h * .5, Math.max(w, h) * .8);
+  g.addColorStop(0, 'rgba(7,9,11,0)'); g.addColorStop(1, 'rgba(7,9,11,.92)'); bgx.fillStyle = g; bgx.fillRect(0, 0, w, h);
+  const g2 = bgx.createLinearGradient(0, 0, w * .6, 0); g2.addColorStop(0, 'rgba(7,9,11,.85)'); g2.addColorStop(1, 'rgba(7,9,11,0)'); bgx.fillStyle = g2; bgx.fillRect(0, 0, w, h);
+}
 
 // ───────── 치장 상점 ─────────
 let shopTab = 'body', shopGun = 'ar', shopRAF = 0;
 const SHOPTABS = { body: '캐릭터', hat: '모자', face: '얼굴', glove: '장갑', bag: '등', gskin: '총 스킨', col: '옷 색상' };
 function reqText(r) { const a = []; if (r.w) a.push(`1등 ${r.w}회`); if (r.x) a.push(`탈출 ${r.x}회`); if (r.k) a.push(`킬 ${r.k}`); if (r.g) a.push(`${r.g}판 플레이`); return a.join(' + ') || '기본'; }
-function shopCount() { let n = 0, t = 0; for (const sl in S.SKINSLOTS) for (const k in S.SKINSLOTS[sl]) { t++; if (S.unlocked(S.SKINSLOTS[sl][k].req, save)) n++; } return `${n}/${t}`; }
+function shopCount() { let n = 0, t = 0; for (const sl in S.SKINSLOTS) for (const k in S.SKINSLOTS[sl]) { t++; if (S.unlocked(S.SKINSLOTS[sl][k].req, prog())) n++; } return `${n}/${t}`; }
 function openShop() {
   save.sel = S.cleanSkin(save.sel);
   const tbl = S.SKINSLOTS[shopTab];
-  $('shopBox').innerHTML = `<div class="row" style="justify-content:space-between"><h3 style="margin:4px 0">👕 치장 <small style="opacity:.6">해금 ${shopCount()} · 능력치 효과 없음</small></h3><button class="g" id="shX">닫기</button></div>
+  $('shopBox').innerHTML = `<div class="row" style="justify-content:space-between"><h3 style="margin:4px 0">치장 <small style="opacity:.6">해금 ${shopCount()} · 능력치 효과 없음</small></h3><button class="g" id="shX">닫기</button></div>
   <div class="row" style="align-items:stretch;flex-wrap:nowrap;gap:10px">
     <div style="flex:0 0 auto;text-align:center"><canvas id="shopPv" width="200" height="200" style="width:150px;height:150px;background:radial-gradient(#3a5a32,#0c140c);border-radius:14px"></canvas>
       <div class="row" style="justify-content:center;gap:3px;margin-top:4px">${['', 'pistol', 'ar', 'sg', 'sniper', 'lmg'].map(w => `<button class="${w === shopGun ? 'y' : 'g'}" data-gun="${w}" style="padding:3px 6px;font-size:11px">${w ? S.WEAPONS[w].n.slice(0, 3) : '맨손'}</button>`).join('')}</div>
-      <button class="b" id="shRand" style="margin-top:6px;padding:6px 10px;font-size:12px">🎲 랜덤 코디</button></div>
+      <button class="b" id="shRand" style="margin-top:6px;padding:6px 10px;font-size:12px">랜덤 코디</button></div>
     <div style="flex:1;min-width:0">
       <div class="row" style="gap:4px">${Object.entries(SHOPTABS).map(([k, v]) => `<button class="${k === shopTab ? 'y' : 'g'}" data-tab="${k}" style="padding:6px 9px;font-size:13px">${v}</button>`).join('')}</div>
-      <div class="grid" style="margin-top:8px;grid-template-columns:repeat(auto-fill,minmax(88px,1fr))">${Object.entries(tbl).map(([k, v]) => { const ok = S.unlocked(v.req, save), sel = save.sel[shopTab] === k; return `<div class="sk ${sel ? 'sel' : ''} ${ok ? '' : 'lock'}" data-k="${k}"><canvas width="160" height="140" style="width:80px;height:70px" data-pv="${k}"></canvas><div><b>${v.n}</b></div><div style="opacity:.7;font-size:11px">${ok ? (sel ? '착용중' : '착용') : '🔒 ' + reqText(v.req)}</div></div>`; }).join('')}</div>
+      <div class="grid" style="margin-top:8px;grid-template-columns:repeat(auto-fill,minmax(88px,1fr))">${Object.entries(tbl).map(([k, v]) => { const ok = S.unlocked(v.req, prog()), sel = save.sel[shopTab] === k; return `<div class="sk ${sel ? 'sel' : ''} ${ok ? '' : 'lock'}" data-k="${k}"><canvas width="160" height="140" style="width:80px;height:70px" data-pv="${k}"></canvas><div><b>${v.n}</b></div><div style="opacity:.7;font-size:11px">${ok ? (sel ? '착용중' : '착용') : '잠김 · ' + reqText(v.req)}</div></div>`; }).join('')}</div>
     </div></div>`;
   $('shop').classList.add('on');
   $('shX').onclick = () => { $('shop').classList.remove('on'); cancelAnimationFrame(shopRAF); };
   $('shopBox').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; openShop(); });
   $('shopBox').querySelectorAll('[data-gun]').forEach(b => b.onclick = () => { shopGun = b.dataset.gun; openShop(); });
-  $('shRand').onclick = () => { for (const sl in S.SKINSLOTS) { const ok = Object.keys(S.SKINSLOTS[sl]).filter(k => S.unlocked(S.SKINSLOTS[sl][k].req, save)); save.sel[sl] = ok[Math.floor(Math.random() * ok.length)]; } persist(); hello(); openShop(); };
-  $('shopBox').querySelectorAll('[data-k]').forEach(d => d.onclick = () => { const v = tbl[d.dataset.k]; if (!S.unlocked(v.req, save)) return toast('🔒 ' + reqText(v.req) + ' 필요'); save.sel[shopTab] = d.dataset.k; persist(); hello(); openShop(); });
+  $('shRand').onclick = () => { for (const sl in S.SKINSLOTS) { const ok = Object.keys(S.SKINSLOTS[sl]).filter(k => S.unlocked(S.SKINSLOTS[sl][k].req, prog())); save.sel[sl] = ok[Math.floor(Math.random() * ok.length)]; } persist(); hello(); openShop(); };
+  $('shopBox').querySelectorAll('[data-k]').forEach(d => d.onclick = () => { const v = tbl[d.dataset.k]; if (!S.unlocked(v.req, prog())) return toast('잠김 · ' + reqText(v.req) + ' 필요'); save.sel[shopTab] = d.dataset.k; persist(); hello(); openShop(); });
   const pvGun = shopTab === 'gskin' && !shopGun ? 'ar' : shopGun;
   $('shopBox').querySelectorAll('[data-pv]').forEach(cv2 => {
     const k = cv2.dataset.pv, x = cv2.getContext('2d'); x.translate(0, 2); x.scale(1.33, 1.13);
@@ -124,7 +259,7 @@ function openShop() {
 }
 // 미리보기 애니메이션
 const pvx = $('pv').getContext('2d');
-function drawPreview(t) { pvx.setTransform(1, 0, 0, 1, 0, 0); pvx.clearRect(0, 0, 90, 90); pvx.translate(45, 45); pvx.scale(1.8, 1.8); drawChar(pvx, 0, 0, -Math.PI / 2 + Math.sin(t / 900) * .4, save.sel, t / 1000, true, 0, 'ar'); }
+function drawPreview(t) { pvx.setTransform(1, 0, 0, 1, 0, 0); pvx.clearRect(0, 0, 168, 168); pvx.translate(72, 92); pvx.scale(1.9, 1.9); drawChar(pvx, 0, 0, -Math.PI / 2 + Math.sin(t / 900) * .4, save.sel, t / 1000, true, 0, 'ar'); }
 
 // ───────── 캐릭터 그리기 ─────────
 // 총 모양: L 길이, w 두께, st 개머리, mg 탄창, sc 기본스코프, pump, box(탄통), two 양손권총형
@@ -354,21 +489,24 @@ function handleEv(ev, now) {
 function onResult(m) {
   if (!G) return;
   G.result = m;
-  save.games++; save.kills += m.kills;
-  if (m.res === 'win') save.wins++;
-  if (m.res === 'extract') { save.ext++; save.val += m.val; }
-  persist(); updStats();
-  const title = { win: '🏆 이겼닭! 오늘 저녁은 치킨이닭!', dead: '💀 사망했습니다', extract: '🚁 탈출 성공!', mia: '⌛ 시간 초과 (MIA)' }[m.res];
-  $('resBox').innerHTML = `<h2>${title}</h2><p style="font-size:18px">${m.mode === 'br' ? `#${m.place} 등 · ` : ''}킬 ${m.kills} · 생존 ${Math.floor(m.time / 60)}분 ${m.time % 60}초</p>
-   ${m.mode === 'ex' ? `<p>${m.res === 'extract' ? `💰 전리품 가치 <b>${m.val.toLocaleString()}</b> 확보!` : '가지고 있던 전리품을 모두 잃었습니다...'}</p>` : ''}
-   <p style="opacity:.75;font-size:13px">총 1등 ${save.wins}회 · 탈출 ${save.ext}회 — 치장 해금을 확인하세요!</p>
-   <div class="row" style="justify-content:center">${m.res !== 'win' && m.res !== 'extract' ? '<button class="g" id="specB">👀 관전 계속</button>' : '<button class="g" id="specB">👀 계속 보기</button>'}<button class="y" id="toLobby">방으로</button><button class="r" id="toMenu">나가기</button></div>`;
+  if (!m.acct) { save.games++; save.kills += m.kills; if (m.res === 'win') save.wins++; if (m.res === 'extract') { save.ext++; save.val += m.val; } persist(); }
+  updStats();
+  const T = { win: ['WINNER', '최후의 생존자'], dead: ['ELIMINATED', '사망'], extract: ['EXTRACTED', '탈출 성공'], mia: ['MISSING IN ACTION', '시간 초과'] }[m.res];
+  let body = '';
+  if (m.mode === 'ex') {
+    if (m.res === 'extract') body = `<p style="color:var(--tx2);font-size:13px;margin:0 0 6px">전리품 <b style="color:var(--acc)">${m.val.toLocaleString()}원</b>${m.acct ? ' 획득' : ''}</p>${m.saved && m.saved.length ? `<div style="font-size:12px;color:var(--tx3);line-height:1.7">창고에 저장: ${m.saved.map(esc).join(', ')}</div>` : !m.acct ? '<div style="font-size:12px;color:var(--tx3)">로그인하면 아이템이 창고에 저장됩니다</div>' : ''}`;
+    else body = `<p style="color:#e08a7f;font-size:13px;margin:0">들고 들어간 장비${m.lost ? ` (${m.lost.toLocaleString()}원 상당)` : ''}와 전리품을 모두 잃었습니다</p>`;
+  }
+  $('resBox').innerHTML = `<div class="rk">${T[0]}</div><h2>${T[1]}</h2>
+   <div class="rs"><div><b>${m.mode === 'br' ? '#' + m.place : (m.res === 'extract' ? 'OK' : '—')}</b><small>${m.mode === 'br' ? '순위' : '탈출'}</small></div><div><b>${m.kills}</b><small>킬</small></div><div><b>${Math.floor(m.time / 60)}:${String(m.time % 60).padStart(2, '0')}</b><small>생존 시간</small></div></div>
+   ${body}
+   <div class="row" style="margin-top:18px"><button class="g" id="specB" style="flex:1">관전</button><button class="y" id="toLobby" style="flex:1">대기실로</button><button class="r" id="toMenu" style="flex:1">나가기</button></div>`;
   $('res').classList.add('on');
   $('specB').onclick = () => $('res').classList.remove('on');
-  $('toLobby').onclick = () => { $('res').classList.remove('on'); toast('게임이 끝나면 방으로 돌아갑니다'); };
+  $('toLobby').onclick = () => { $('res').classList.remove('on'); toast('게임이 끝나면 대기실로 돌아갑니다'); };
   $('toMenu').onclick = () => { $('res').classList.remove('on'); sendM({ t: 'leave' }); };
 }
-function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop']) $(id).classList.remove('on'); }
+function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop', 'stashm', 'authm', 'pwm']) $(id).classList.remove('on'); }
 
 // ───────── 입력 ─────────
 const cv = $('cv'), ctx = cv.getContext('2d');
@@ -541,7 +679,7 @@ let lastFrame = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(.05, (now - lastFrame) / 1000); lastFrame = now;
-  if (!G) { if ($('menu').classList.contains('on')) drawPreview(now); return; }
+  if (!G) { drawBg(now); if ($('menu').classList.contains('on')) drawPreview(now); return; }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!G.M || !G.me) { ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('맵 불러오는 중…', W / 2, H / 2); return; }
   const M = G.M, me = G.me;
