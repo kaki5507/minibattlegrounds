@@ -2,11 +2,12 @@
 (function (root) {
 'use strict';
 const S = {};
-S.W = 8000; S.H = 8000; S.CX = 4000; S.CY = 4000; S.ISLAND = 3900; S.CELL = 250;
+S.CELL = 250;
 S.PR = 16;          // 플레이어 반지름
-S.SPEED = 190;      // 기본 이동속도 px/s
+S.SPEED = 200;      // 기본 이동속도 px/s
 S.VIS = 620;        // 시야 반경
-S.VIS_SCOPE = 1150; // 스코프 시야(조준 방향 원뿔)
+S.VIS_ADS = 900;    // 조준(ADS) 시야
+S.VIS_SCOPE = 1650; // 스코프 조준 시야(조준 방향 원뿔)
 S.SCOPE_CONE = 0.5; // 라디안(±약 28도)
 S.MAXP = 10;        // 방 최대 인원
 S.MINP = 5;         // 자동 시작 인원
@@ -16,13 +17,13 @@ S.rng = function (a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let 
 // ───────── 무기 ─────────
 // dmg 피해, iv 연사간격ms, mag 탄창, rl 재장전ms, spd 탄속, rng 사거리, sp 기본 탄퍼짐(도), rc 발당 반동(도), rmax 최대반동, rr 반동회복(도/초), pel 산탄수, am 탄종, auto 연사, mv 이동배율
 S.WEAPONS = {
-  pistol: { n: '권총', dmg: 20, iv: 300, mag: 12, rl: 1100, spd: 1500, rng: 650, sp: 1.5, rc: 2.6, rmax: 10, rr: 16, pel: 1, am: 'light', auto: 0, mv: 1.0, c: '#cfd8dc' },
-  smg: { n: '기관단총', dmg: 13, iv: 68, mag: 30, rl: 1500, spd: 1400, rng: 520, sp: 3, rc: 1.7, rmax: 14, rr: 14, pel: 1, am: 'light', auto: 1, mv: .98, c: '#90caf9' },
-  ar: { n: '돌격소총', dmg: 21, iv: 105, mag: 30, rl: 1900, spd: 1700, rng: 820, sp: 1.3, rc: 2.5, rmax: 15, rr: 12, pel: 1, am: 'rifle', auto: 1, mv: .95, c: '#a5d6a7' },
-  dmr: { n: '지정사수소총', dmg: 44, iv: 340, mag: 10, rl: 2200, spd: 2100, rng: 1150, sp: .5, rc: 4.5, rmax: 12, rr: 10, pel: 1, am: 'rifle', auto: 0, mv: .92, c: '#ffe082' },
-  sg: { n: '샷건', dmg: 11, iv: 850, mag: 6, rl: 2400, spd: 1100, rng: 330, sp: 7, rc: 9, rmax: 16, rr: 10, pel: 8, am: 'shell', auto: 0, mv: .97, c: '#ffab91' },
-  sniper: { n: '저격총', dmg: 110, iv: 1500, mag: 5, rl: 2900, spd: 2800, rng: 1700, sp: .1, rc: 12, rmax: 20, rr: 8, pel: 1, am: 'sniper', auto: 0, mv: .85, c: '#ce93d8', scope: 1 },
-  lmg: { n: '경기관총', dmg: 19, iv: 82, mag: 60, rl: 4300, spd: 1600, rng: 760, sp: 2.5, rc: 1.3, rmax: 22, rr: 9, pel: 1, am: 'rifle', auto: 1, mv: .82, c: '#ef9a9a' },
+  pistol: { n: '권총', dmg: 20, iv: 300, mag: 12, rl: 1100, spd: 620, rng: 650, sp: 1.5, rc: 2.6, rmax: 10, rr: 16, pel: 1, am: 'light', auto: 0, mv: 1.0, c: '#cfd8dc' },
+  smg: { n: '기관단총', dmg: 13, iv: 68, mag: 30, rl: 1500, spd: 600, rng: 520, sp: 3, rc: 1.7, rmax: 14, rr: 14, pel: 1, am: 'light', auto: 1, mv: .98, c: '#90caf9' },
+  ar: { n: '돌격소총', dmg: 21, iv: 105, mag: 30, rl: 1900, spd: 740, rng: 820, sp: 1.3, rc: 2.5, rmax: 15, rr: 12, pel: 1, am: 'rifle', auto: 1, mv: .95, c: '#a5d6a7' },
+  dmr: { n: '지정사수소총', dmg: 44, iv: 340, mag: 10, rl: 2200, spd: 1100, rng: 1150, sp: .5, rc: 4.5, rmax: 12, rr: 10, pel: 1, am: 'rifle', auto: 0, mv: .92, c: '#ffe082' },
+  sg: { n: '샷건', dmg: 11, iv: 850, mag: 6, rl: 2400, spd: 540, rng: 330, sp: 7, rc: 9, rmax: 16, rr: 10, pel: 8, am: 'shell', auto: 0, mv: .97, c: '#ffab91' },
+  sniper: { n: '저격총', dmg: 110, iv: 1500, mag: 5, rl: 2900, spd: 1750, rng: 1700, sp: .1, rc: 12, rmax: 20, rr: 8, pel: 1, am: 'sniper', auto: 0, mv: .85, c: '#ce93d8', scope: 1 },
+  lmg: { n: '경기관총', dmg: 19, iv: 82, mag: 60, rl: 4300, spd: 700, rng: 760, sp: 2.5, rc: 1.3, rmax: 22, rr: 9, pel: 1, am: 'rifle', auto: 1, mv: .82, c: '#ef9a9a' },
 };
 S.AMMO = { light: '경량탄', rifle: '소총탄', shell: '산탄', sniper: '저격탄' };
 S.ATT = {
@@ -164,7 +165,7 @@ S.cleanSkin = function (k) {
   if (o.col === 'green' && !(k.col in S.COLORS)) o.col = 'green';
   return o;
 };
-S.unlocked = function (req, save) { return (save.wins || 0) >= (req.w || 0) && (save.ext || 0) >= (req.x || 0) && (save.kills || 0) >= (req.k || 0) && (save.games || 0) >= (req.g || 0); };
+S.unlocked = function (req, save) { return S.levelOf(save.xp).l >= (req.l || 0) && (save.wins || 0) >= (req.w || 0) && (save.ext || 0) >= (req.x || 0) && (save.kills || 0) >= (req.k || 0) && (save.games || 0) >= (req.g || 0); };
 
 // ───────── 기하 ─────────
 function segRect(x1, y1, x2, y2, rx, ry, rw, rh) {
@@ -189,21 +190,22 @@ function distSeg(px, py, x1, y1, x2, y2) {
 }
 S.distSeg = distSeg;
 
-// ───────── 맵 생성 (에란겔 느낌의 섬) ─────────
-S.genMap = function (seed) {
-  const R = S.rng(seed), rnd = (a, b) => a + (b - a) * R(), ri = (a, b) => Math.floor(rnd(a, b + 1));
-  const M = { seed, walls: [], circles: [], lakes: [], towns: [], blds: [], portals: [], roads: [], vehSpots: [], loot: [], extracts: [], tps: [] };
-  const T = 12;
-  const inIsland = (x, y, m) => Math.hypot(x - S.CX, y - S.CY) < S.ISLAND - m;
-  // 호수
-  for (let i = 0; i < 40 && M.lakes.length < 6; i++) {
-    const a = rnd(0, 6.283), d = rnd(600, 3200), x = S.CX + Math.cos(a) * d, y = S.CY + Math.sin(a) * d, r = rnd(180, 400);
-    if (!inIsland(x, y, r + 150)) continue;
-    if (M.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + r + 400)) continue;
-    M.lakes.push({ x, y, r });
-  }
+// ───────── 맵 생성 ─────────
+// br: 에란겔 느낌의 큰 섬 / ex: 던전 5개가 있는 거대 레이드 월드
+S.MAPCFG = { br: { W: 12000, R: 5850 }, ex: { W: 16000, R: 7800 } };
+S.BOXKIND = { crate: '나무 상자', cabinet: '서랍장', bag: '더플백', weapon: '무기 상자', med: '의료 상자', safe: '금고', body: '시체', supply: '보급 상자' };
+S.genMap = function (seed, kind) {
+  kind = kind === 'ex' ? 'ex' : 'br';
+  const cfg = S.MAPCFG[kind];
+  const R = S.rng(seed), rnd = (a, b) => a + (b - a) * R(), ri = (a, b) => Math.floor(rnd(a, b + 1)), pickR = a => a[Math.floor(R() * a.length)];
+  const M = { seed, kind, W: cfg.W, CX: cfg.W / 2, CY: cfg.W / 2, R: cfg.R, walls: [], circles: [], lakes: [], towns: [], blds: [], portals: [], roads: [], vehSpots: [], loot: [], extracts: [], tps: [], entries: [], dungeons: [], spawns: [] };
+  const CX = M.CX, CY = M.CY, ISL = M.R, T = 12;
+  const polar = (dmin, dmax, a) => { a = a === undefined ? rnd(0, 6.283) : a; const d = rnd(dmin, dmax); return [CX + Math.cos(a) * d, CY + Math.sin(a) * d]; };
+  const inIsland = (x, y, m) => Math.hypot(x - CX, y - CY) < ISL - m;
+  const inDungeon = (x, y, m) => M.dungeons.some(d => Math.abs(x - d.x) < d.s / 2 + m && Math.abs(y - d.y) < d.s / 2 + m);
   const nearLake = (x, y, m) => M.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m);
-  // 벽 헬퍼
+  const boxKind = (tier, indoor) => { const r = R(); if (tier >= 3 && r < .12) return 'safe'; if (tier >= 2 && r < .3) return 'weapon'; if (r < .15) return 'med'; if (!indoor) return r < .6 ? 'bag' : 'crate'; return r < .55 ? 'cabinet' : r < .8 ? 'crate' : 'bag'; };
+  const addLoot = (x, y, f, tier, indoor) => M.loot.push({ x, y, f, tier, k: boxKind(tier, indoor) });
   function side(x, y, len, horiz, gaps, f) {
     gaps.sort((a, b) => a.c - b.c); let pos = 0;
     const seg = (a, b, win) => { if (b - a < 2) return; M.walls.push(horiz ? { x: x + a, y: y - T / 2, w: b - a, h: T, f, win: win ? 1 : 0 } : { x: x - T / 2, y: y + a, w: T, h: b - a, f, win: win ? 1 : 0 }); };
@@ -215,20 +217,17 @@ S.genMap = function (seed) {
     const doorSides = [0, 1, 2, 3].sort(() => R() - .5).slice(0, ri(1, 2));
     for (let f = 0; f < nf; f++) {
       const sides = [[bx, by, bw, true], [bx, by + bh, bw, true], [bx, by, bh, false], [bx + bw, by, bh, false]];
-      sides.forEach((s, i) => {
-        const len = s[2], gaps = [];
+      sides.forEach((sd, i) => {
+        const len = sd[2], gaps = [];
         if (f === 0 && doorSides.includes(i)) gaps.push({ c: rnd(50, len - 50), w: 58, t: 'door' });
         else gaps.push({ c: len / 2 + rnd(-len / 5, len / 5), w: 56, t: 'win' });
-        side(s[0], s[1], len, s[3], gaps, f);
+        side(sd[0], sd[1], len, sd[3], gaps, f);
       });
-      // 내부 칸막이
       if (bw > bh) { const px = bx + bw * rnd(.38, .62); side(px, by, bh, false, [{ c: rnd(45, bh - 45), w: 56, t: 'door' }], f); }
       else { const py = by + bh * rnd(.38, .62); side(bx, py, bw, true, [{ c: rnd(45, bw - 45), w: 56, t: 'door' }], f); }
-      // 루팅 위치
-      const cnt = ri(2, 4);
-      for (let k = 0; k < cnt; k++) M.loot.push({ x: rnd(bx + 30, bx + bw - 30), y: rnd(by + 30, by + bh - 30), f, tier: Math.min(2, tier + (f > 0 ? 1 : 0) * (R() < .5 ? 1 : 0)) });
+      const cnt = ri(1, 3);
+      for (let k = 0; k < cnt; k++) addLoot(rnd(bx + 30, bx + bw - 30), rnd(by + 30, by + bh - 30), f, Math.min(3, tier + (f > 0 && R() < .5 ? 1 : 0)), true);
     }
-    // 계단 포탈
     const cs = [[bx + 32, by + 32], [bx + bw - 32, by + bh - 32]];
     for (let k = 0; k < nf - 1; k++) {
       const c = cs[k % 2];
@@ -237,81 +236,147 @@ S.genMap = function (seed) {
     }
   }
   const overlapsB = (x, y, w, h, m) => M.blds.some(b => x < b.x + b.w + m && x + w > b.x - m && y < b.y + b.h + m && y + h > b.y - m);
-  // 마을
-  const kinds = ['mil', 'mil', 'big', 'big', 'big', 'big', 'small', 'small', 'small', 'small', 'small', 'small'];
-  const names = { mil: ['북부 군사기지', '폐광산 기지'], big: ['오리시티', '호수마을', '항구도시', '중앙학교'], small: ['풍차농장', '시립병원', '등대마을', '송전소', '철강공장', '숲속산장'] };
-  const used = { mil: 0, big: 0, small: 0 };
-  for (const kind of kinds) {
-    for (let tries = 0; tries < 300; tries++) {
-      const a = rnd(0, 6.283), d = rnd(300, 3200), x = S.CX + Math.cos(a) * d, y = S.CY + Math.sin(a) * d;
-      if (!inIsland(x, y, 600) || nearLake(x, y, 550)) continue;
-      if (M.towns.some(t => Math.hypot(t.x - x, t.y - y) < 950)) continue;
-      const town = { x, y, kind, name: names[kind][used[kind]++] }; M.towns.push(town);
-      const tier = kind === 'mil' ? 2 : kind === 'big' ? 1 : 0;
-      const nb = kind === 'big' ? ri(7, 9) : kind === 'mil' ? ri(4, 5) : ri(3, 5);
-      let placed = 0;
-      for (let k = 0; k < 200 && placed < nb; k++) {
-        const big = kind === 'mil';
-        const bw = big ? rnd(220, 300) : rnd(140, 250), bh = big ? rnd(180, 260) : rnd(130, 210);
-        const bx = x + rnd(-430, 430) - bw / 2, by = y + rnd(-430, 430) - bh / 2;
-        if (overlapsB(bx, by, bw, bh, 70)) continue;
-        if (!inIsland(bx + bw / 2, by + bh / 2, 300)) continue;
-        const r = R(); const nf = kind === 'small' ? (r < .6 ? 1 : 2) : (r < .35 ? 1 : r < .7 ? 2 : 3);
-        building(bx, by, bw, bh, nf, tier, M.towns.length - 1); placed++;
+  function tpPair(A, B, label) {
+    const ia = M.portals.length, p = M.tps.length / 2;
+    M.portals.push({ id: ia, x: A[0], y: A[1], f: 0, tx: B[0], ty: B[1], tf: 0, r: 34, kind: 'tp', pair: p, to: label ? label[1] : '' });
+    M.portals.push({ id: ia + 1, x: B[0], y: B[1], f: 0, tx: A[0], ty: A[1], tf: 0, r: 34, kind: 'tp', pair: p, to: label ? label[0] : '' });
+    M.tps.push({ x: A[0], y: A[1], pair: p }, { x: B[0], y: B[1], pair: p });
+  }
+  // 호수
+  const nLake = kind === 'br' ? 9 : 5;
+  for (let i = 0; i < 120 && M.lakes.length < nLake; i++) {
+    const [x, y] = polar(ISL * .15, ISL * .82), r = rnd(200, 460);
+    if (!inIsland(x, y, r + 150) || M.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + r + 500)) continue;
+    if (kind === 'ex' && [[CX, CY]].concat([0, 1, 2, 3].map(k => [CX + Math.cos(k * 1.5708 + .785) * 4600, CY + Math.sin(k * 1.5708 + .785) * 4600])).some(q => Math.abs(q[0] - x) < 1700 + r && Math.abs(q[1] - y) < 1700 + r)) continue;
+    M.lakes.push({ x, y, r });
+  }
+
+  if (kind === 'br') {
+    // ───── 마을 ─────
+    const kinds = ['mil', 'mil', 'mil', 'big', 'big', 'big', 'big', 'big', 'small', 'small', 'small', 'small', 'small', 'small', 'small', 'small', 'small'];
+    const names = { mil: ['북부 군사기지', '폐광산 기지', '해안 레이더'], big: ['오리시티', '호수마을', '항구도시', '중앙학교', '신도시'], small: ['풍차농장', '시립병원', '등대마을', '송전소', '철강공장', '숲속산장', '채석장', '양계장', '기차역'] };
+    const used = { mil: 0, big: 0, small: 0 };
+    for (const k of kinds) {
+      for (let tries = 0; tries < 400; tries++) {
+        const [x, y] = polar(ISL * .05, ISL * .84);
+        if (!inIsland(x, y, 650) || nearLake(x, y, 600) || M.towns.some(t => Math.hypot(t.x - x, t.y - y) < 1350)) continue;
+        M.towns.push({ x, y, kind: k, name: names[k][used[k]++] });
+        const tier = k === 'mil' ? 2 : k === 'big' ? 1 : 0, nb = k === 'big' ? ri(8, 11) : k === 'mil' ? ri(4, 6) : ri(3, 5);
+        for (let n = 0, placed = 0; n < 250 && placed < nb; n++) {
+          const big = k === 'mil', bw = big ? rnd(220, 300) : rnd(140, 250), bh = big ? rnd(180, 260) : rnd(130, 210);
+          const sp = k === 'big' ? 520 : 430, bx = x + rnd(-sp, sp) - bw / 2, by = y + rnd(-sp, sp) - bh / 2;
+          if (overlapsB(bx, by, bw, bh, 70) || !inIsland(bx + bw / 2, by + bh / 2, 300)) continue;
+          const r = R(); building(bx, by, bw, bh, k === 'small' ? (r < .6 ? 1 : 2) : (r < .35 ? 1 : r < .7 ? 2 : 3), tier, M.towns.length - 1); placed++;
+        }
+        if (k === 'mil') {
+          const fr = 560;
+          side(x - fr, y - fr, fr * 2, true, [{ c: fr, w: 110, t: 'door' }], 0); side(x - fr, y + fr, fr * 2, true, [{ c: fr, w: 110, t: 'door' }], 0);
+          side(x - fr, y - fr, fr * 2, false, [{ c: fr * .5, w: 90, t: 'door' }], 0); side(x + fr, y - fr, fr * 2, false, [{ c: fr * 1.5, w: 90, t: 'door' }], 0);
+          for (let n = 0; n < 8; n++) { const cx = x + rnd(-480, 480), cy = y + rnd(-480, 480); if (!overlapsB(cx - 30, cy - 30, 60, 60, 20)) M.circles.push({ x: cx, y: cy, r: rnd(22, 34), t: 'crate' }); }
+        }
+        break;
       }
-      if (kind === 'mil') { // 외곽 담장
-        const fr = 560;
-        side(x - fr, y - fr, fr * 2, true, [{ c: fr, w: 110, t: 'door' }], 0);
-        side(x - fr, y + fr, fr * 2, true, [{ c: fr, w: 110, t: 'door' }], 0);
-        side(x - fr, y - fr, fr * 2, false, [{ c: fr * .5, w: 90, t: 'door' }], 0);
-        side(x + fr, y - fr, fr * 2, false, [{ c: fr * 1.5, w: 90, t: 'door' }], 0);
-        for (let k = 0; k < 8; k++) { const cx = x + rnd(-480, 480), cy = y + rnd(-480, 480); if (!overlapsB(cx - 30, cy - 30, 60, 60, 20)) M.circles.push({ x: cx, y: cy, r: rnd(22, 34), t: 'crate' }); }
-      }
-      break;
     }
+    const pairs = new Set();
+    M.towns.forEach((t, i) => {
+      const near = M.towns.map((o, j) => [j, Math.hypot(o.x - t.x, o.y - t.y)]).filter(q => q[0] !== i).sort((q, w) => q[1] - w[1]).slice(0, 2);
+      for (const [j] of near) { const key = Math.min(i, j) + '-' + Math.max(i, j); if (pairs.has(key)) continue; pairs.add(key); const o = M.towns[j]; const mx = (t.x + o.x) / 2 + rnd(-250, 250), my = (t.y + o.y) / 2 + rnd(-250, 250); M.roads.push([t.x, t.y, mx, my], [mx, my, o.x, o.y]); }
+    });
+    for (let p = 0, tries = 0; p < 4 && tries < 800; tries++) {
+      const A = polar(ISL * .2, ISL * .85), B = polar(ISL * .2, ISL * .85);
+      if (Math.hypot(A[0] - B[0], A[1] - B[1]) < ISL * .9) continue;
+      if ([A, B].some(q => !inIsland(q[0], q[1], 200) || nearLake(q[0], q[1], 120) || overlapsB(q[0] - 60, q[1] - 60, 120, 120, 30) || M.tps.some(t => Math.hypot(t.x - q[0], t.y - q[1]) < 900))) continue;
+      tpPair(A, B); p++;
+    }
+  } else {
+    // ───── 던전 5개 ─────
+    const DG = [{ name: '중앙 연구소', tier: 5, a: null }, { name: '폐공장', tier: 1, a: .785 }, { name: '항구 창고', tier: 2, a: 2.356 }, { name: '지하 벙커', tier: 3, a: 3.927 }, { name: '군사 기지', tier: 4, a: 5.498 }];
+    const CELLN = 5;
+    DG.forEach((d, di) => {
+      const s = di === 0 ? 3000 : 2600, x = d.a === null ? CX : CX + Math.cos(d.a) * 4600, y = d.a === null ? CY : CY + Math.sin(d.a) * 4600;
+      const dg = { name: d.name, tier: d.tier, x, y, s, cells: [] }; M.dungeons.push(dg);
+      const x0 = x - s / 2, y0 = y - s / 2, cs = s / CELLN;
+      // 외벽 + 정문 4개
+      side(x0, y0, s, true, [{ c: s / 2, w: 140, t: 'door' }], 0); side(x0, y0 + s, s, true, [{ c: s / 2, w: 140, t: 'door' }], 0);
+      side(x0, y0, s, false, [{ c: s / 2, w: 140, t: 'door' }], 0); side(x0 + s, y0, s, false, [{ c: s / 2, w: 140, t: 'door' }], 0);
+      // 미로 (랜덤 DFS + 추가 통로)
+      const open = new Set(), seen = new Set(), key = (a, b, c2, d2) => a + ',' + b + '|' + c2 + ',' + d2;
+      const st = [[2, 2]]; seen.add('2,2');
+      while (st.length) {
+        const [cx, cy] = st[st.length - 1];
+        const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(q => [cx + q[0], cy + q[1]]).filter(q => q[0] >= 0 && q[1] >= 0 && q[0] < CELLN && q[1] < CELLN && !seen.has(q[0] + ',' + q[1]));
+        if (!nb.length) { st.pop(); continue; }
+        const n = pickR(nb); seen.add(n[0] + ',' + n[1]); open.add(key(Math.min(cx, n[0]), Math.min(cy, n[1]), Math.max(cx, n[0]), Math.max(cy, n[1]))); st.push(n);
+      }
+      for (let cy = 0; cy < CELLN; cy++) for (let cx = 0; cx < CELLN; cx++) {
+        if (cx < CELLN - 1) { const k = key(cx, cy, cx + 1, cy); const o = open.has(k) || R() < .3; side(x0 + (cx + 1) * cs, y0 + cy * cs, cs, false, o ? [{ c: cs * rnd(.3, .7), w: 96, t: 'door' }] : (R() < .35 ? [{ c: cs / 2, w: 70, t: 'win' }] : []), 0); }
+        if (cy < CELLN - 1) { const k = key(cx, cy, cx, cy + 1); const o = open.has(k) || R() < .3; side(x0 + cx * cs, y0 + (cy + 1) * cs, cs, true, o ? [{ c: cs * rnd(.3, .7), w: 96, t: 'door' }] : (R() < .35 ? [{ c: cs / 2, w: 70, t: 'win' }] : []), 0); }
+      }
+      // 칸마다 내용
+      const lt = Math.min(3, Math.floor((d.tier + 1) / 2));
+      for (let cy = 0; cy < CELLN; cy++) for (let cx = 0; cx < CELLN; cx++) {
+        const ccx = x0 + (cx + .5) * cs, ccy = y0 + (cy + .5) * cs, cell = { x: ccx, y: ccy, cx, cy, used: false };
+        dg.cells.push(cell);
+        const isGateCell = (cx === 2 && (cy === 0 || cy === CELLN - 1)) || (cy === 2 && (cx === 0 || cx === CELLN - 1));
+        if (!isGateCell && R() < (d.tier >= 3 ? .22 : .14)) { // 다층 건물
+          const bw = cs - 150, bh = cs - 150; building(ccx - bw / 2, ccy - bh / 2, bw, bh, d.tier >= 4 ? 3 : 2, lt, null); cell.used = true; cell.bld = true;
+        } else {
+          const nc = ri(2, 5); for (let n = 0; n < nc; n++) { const px = ccx + rnd(-cs * .36, cs * .36), py = ccy + rnd(-cs * .36, cs * .36); if (Math.hypot(px - ccx, py - ccy) > 70) M.circles.push({ x: px, y: py, r: rnd(18, 30), t: 'crate' }); }
+          const nl = ri(1, 2 + (d.tier >= 4 ? 1 : 0)); for (let n = 0; n < nl; n++) addLoot(ccx + rnd(-cs * .38, cs * .38), ccy + rnd(-cs * .38, cs * .38), 0, Math.min(3, lt + (R() < .2 ? 1 : 0)), true);
+        }
+        if (!isGateCell && R() < .55 + d.tier * .06) M.spawns.push({ x: ccx + rnd(-60, 60), y: ccy + rnd(-60, 60), dg: di, tier: d.tier });
+      }
+    });
+    // 던전 연결 포탈 (바깥 던전 → 중앙, 바깥 → 다음 바깥)
+    const freeCell = dg => { const c = dg.cells.filter(c => !c.used && !(c.cx === 2 && c.cy === 2)); const k = c[Math.floor(R() * c.length)]; k.used = true; return [k.x, k.y]; };
+    for (let i = 1; i <= 4; i++) {
+      const D = M.dungeons[i];
+      tpPair(freeCell(D), freeCell(M.dungeons[0]), [D.name, M.dungeons[0].name]);
+      const N = M.dungeons[i % 4 + 1]; tpPair(freeCell(D), freeCell(N), [D.name, N.name]);
+    }
+    // 도로: 바깥 던전 정문 ↔ 중앙 정문, 바깥끼리 링
+    for (let i = 1; i <= 4; i++) {
+      const D = M.dungeons[i], a = Math.atan2(CY - D.y, CX - D.x), gx = D.x + Math.sign(Math.cos(a)) * D.s / 2, gy = D.y;
+      M.roads.push([gx, gy, gx + (CX - gx) * .55, gy], [gx + (CX - gx) * .55, gy, CX - Math.sign(Math.cos(a)) * 1500, CY]);
+      const N = M.dungeons[i % 4 + 1]; M.roads.push([D.x, D.y + Math.sign(N.y - D.y || 1) * D.s / 2, D.x, N.y], [D.x, N.y, N.x - Math.sign(N.x - D.x) * N.s / 2, N.y]);
+    }
+    // 바깥 오두막
+    for (let n = 0, placed = 0; n < 600 && placed < 18; n++) {
+      const [x, y] = polar(ISL * .2, ISL * .9), bw = rnd(150, 230), bh = rnd(130, 200);
+      if (!inIsland(x, y, 300) || inDungeon(x, y, 260) || nearLake(x, y, 250) || overlapsB(x - bw / 2, y - bh / 2, bw, bh, 300)) continue;
+      building(x - bw / 2, y - bh / 2, bw, bh, R() < .7 ? 1 : 2, R() < .3 ? 1 : 0, null); placed++;
+    }
+    // 입장 포탈 (외곽 여러 곳)
+    for (let n = 0, tries = 0; n < 16 && tries < 2000; tries++) {
+      const [x, y] = polar(ISL * .78, ISL * .93);
+      if (!inIsland(x, y, 150) || inDungeon(x, y, 300) || nearLake(x, y, 150) || overlapsB(x - 80, y - 80, 160, 160, 40) || M.entries.some(e => Math.hypot(e.x - x, e.y - y) < 1300)) continue;
+      M.entries.push({ x, y }); n++;
+    }
+    // 고정 탈출구: 해안 4곳 + 중앙 연구소 비상구
+    for (let i = 0; i < 4; i++) { const a = i * 1.5708; for (let d = ISL - 300; d > ISL - 1200; d -= 50) { const x = CX + Math.cos(a) * d, y = CY + Math.sin(a) * d; if (!nearLake(x, y, 150) && !overlapsB(x - 110, y - 110, 220, 220, 0) && !inDungeon(x, y, 120)) { M.extracts.push({ x, y, r: 100, name: S.dirName(a) + '쪽 해안 탈출구' }); break; } } }
+    { const c = freeCell(M.dungeons[0]); M.extracts.push({ x: c[0], y: c[1], r: 80, name: '연구소 비상 탈출구', risky: 1 }); }
   }
-  // 도로
-  const pairs = new Set();
-  M.towns.forEach((t, i) => {
-    const near = M.towns.map((o, j) => [j, Math.hypot(o.x - t.x, o.y - t.y)]).filter(a => a[0] !== i).sort((a, b) => a[1] - b[1]).slice(0, 2);
-    for (const [j] of near) { const key = Math.min(i, j) + '-' + Math.max(i, j); if (pairs.has(key)) continue; pairs.add(key); const o = M.towns[j]; const mx = (t.x + o.x) / 2 + rnd(-200, 200), my = (t.y + o.y) / 2 + rnd(-200, 200); M.roads.push([t.x, t.y, mx, my], [mx, my, o.x, o.y]); }
-  });
   const nearRoad = (x, y, m) => M.roads.some(r => distSeg(x, y, r[0], r[1], r[2], r[3]) < m);
-  // 차량 위치
-  for (const r of M.roads) { for (let k = 0; k < 1; k++) { const t = rnd(.2, .8), x = r[0] + (r[2] - r[0]) * t, y = r[1] + (r[3] - r[1]) * t; if (inIsland(x, y, 100) && !nearLake(x, y, 60) && !overlapsB(x - 40, y - 40, 80, 80, 10)) M.vehSpots.push({ x, y, a: Math.atan2(r[3] - r[1], r[2] - r[0]) }); } }
-  // 순간이동 포탈 (먼 지역 연결)
-  for (let p = 0, tries = 0; p < 3 && tries < 500; tries++) {
-    const pts = [];
-    for (let k = 0; k < 2; k++) { const a = rnd(0, 6.283), d = rnd(900, 3300); pts.push([S.CX + Math.cos(a) * d, S.CY + Math.sin(a) * d]); }
-    const [A, B] = pts; if (Math.hypot(A[0] - B[0], A[1] - B[1]) < 2500) continue;
-    if (pts.some(q => !inIsland(q[0], q[1], 200) || nearLake(q[0], q[1], 120) || overlapsB(q[0] - 60, q[1] - 60, 120, 120, 30) || M.tps.some(t => Math.hypot(t.x - q[0], t.y - q[1]) < 600))) continue;
-    const ia = M.portals.length;
-    M.portals.push({ id: ia, x: A[0], y: A[1], f: 0, tx: B[0], ty: B[1], tf: 0, r: 34, kind: 'tp', pair: p });
-    M.portals.push({ id: ia + 1, x: B[0], y: B[1], f: 0, tx: A[0], ty: A[1], tf: 0, r: 34, kind: 'tp', pair: p });
-    M.tps.push({ x: A[0], y: A[1], pair: p }, { x: B[0], y: B[1], pair: p }); p++;
-  }
+  for (const r of M.roads) { const t = rnd(.2, .8), x = r[0] + (r[2] - r[0]) * t, y = r[1] + (r[3] - r[1]) * t; if (inIsland(x, y, 100) && !nearLake(x, y, 60) && !overlapsB(x - 40, y - 40, 80, 80, 10) && !inDungeon(x, y, 60)) M.vehSpots.push({ x, y, a: Math.atan2(r[3] - r[1], r[2] - r[0]) }); }
   // 나무/바위
-  const forests = []; for (let i = 0; i < 12; i++) { const a = rnd(0, 6.283), d = rnd(400, 3500); forests.push([S.CX + Math.cos(a) * d, S.CY + Math.sin(a) * d, rnd(280, 480)]); }
-  const okSpot = (x, y, r) => inIsland(x, y, r + 20) && !nearLake(x, y, r + 30) && !overlapsB(x - r, y - r, r * 2, r * 2, 35) && !nearRoad(x, y, 40 + r) && !M.tps.some(t => Math.hypot(t.x - x, t.y - y) < 90) && !M.towns.some(t => t.kind === 'mil' && Math.abs(t.x - x) < 600 && Math.abs(t.y - y) < 600 && (Math.abs(Math.abs(t.x - x) - 560) < 40 + r || Math.abs(Math.abs(t.y - y) - 560) < 40 + r));
-  for (let i = 0; i < 3200; i++) {
-    let x, y; if (R() < .6) { const fo = forests[ri(0, forests.length - 1)], a = rnd(0, 6.283), d = Math.sqrt(R()) * fo[2]; x = fo[0] + Math.cos(a) * d; y = fo[1] + Math.sin(a) * d; }
-    else { const a = rnd(0, 6.283), d = Math.sqrt(R()) * S.ISLAND; x = S.CX + Math.cos(a) * d; y = S.CY + Math.sin(a) * d; }
-    const r = rnd(16, 24); if (!okSpot(x, y, r)) continue;
-    M.circles.push({ x, y, r, t: 'tree' });
+  const k2 = (ISL / 3900) * (ISL / 3900);
+  const forests = []; for (let i = 0; i < Math.round(12 * k2); i++) { const [x, y] = polar(ISL * .1, ISL * .9); forests.push([x, y, rnd(300, 560)]); }
+  const okSpot = (x, y, r) => inIsland(x, y, r + 20) && !nearLake(x, y, r + 30) && !overlapsB(x - r, y - r, r * 2, r * 2, 35) && !nearRoad(x, y, 40 + r) && !inDungeon(x, y, 60 + r) && !M.tps.some(t => Math.hypot(t.x - x, t.y - y) < 90) && !M.entries.some(t => Math.hypot(t.x - x, t.y - y) < 120) && !M.extracts.some(t => Math.hypot(t.x - x, t.y - y) < t.r + 20) && !M.towns.some(t => t.kind === 'mil' && Math.abs(t.x - x) < 600 && Math.abs(t.y - y) < 600 && (Math.abs(Math.abs(t.x - x) - 560) < 40 + r || Math.abs(Math.abs(t.y - y) - 560) < 40 + r));
+  const nTree = Math.round(3200 * k2 * .85);
+  for (let i = 0; i < nTree; i++) {
+    let x, y; if (R() < .6) { const fo = pickR(forests), a = rnd(0, 6.283), d = Math.sqrt(R()) * fo[2]; x = fo[0] + Math.cos(a) * d; y = fo[1] + Math.sin(a) * d; }
+    else { const a = rnd(0, 6.283), d = Math.sqrt(R()) * ISL; x = CX + Math.cos(a) * d; y = CY + Math.sin(a) * d; }
+    const r = rnd(16, 24); if (okSpot(x, y, r)) M.circles.push({ x, y, r, t: 'tree' });
   }
-  for (let i = 0; i < 260; i++) { const a = rnd(0, 6.283), d = Math.sqrt(R()) * S.ISLAND, x = S.CX + Math.cos(a) * d, y = S.CY + Math.sin(a) * d, r = rnd(24, 48); if (okSpot(x, y, r)) M.circles.push({ x, y, r, t: 'rock' }); }
-  // 야외 루팅
-  for (let i = 0; i < 260; i++) { const a = rnd(0, 6.283), d = Math.sqrt(R()) * 3600, x = S.CX + Math.cos(a) * d, y = S.CY + Math.sin(a) * d; if (okSpot(x, y, 14)) M.loot.push({ x, y, f: 0, tier: 0 }); }
-  // 탈출 지점 (해안가)
-  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + rnd(-.2, .2); for (let d = 3550; d > 2800; d -= 50) { const x = S.CX + Math.cos(a) * d, y = S.CY + Math.sin(a) * d; if (!nearLake(x, y, 150) && !overlapsB(x - 100, y - 100, 200, 200, 0)) { M.extracts.push({ x, y, r: 95, name: ['북','북동','남동','남','남서','북서'][0] }); break; } } }
-  M.extracts.forEach((e, i) => { const ang = Math.atan2(e.y - S.CY, e.x - S.CX); e.name = S.dirName(ang) + ' 탈출구'; });
+  for (let i = 0; i < Math.round(260 * k2); i++) { const a = rnd(0, 6.283), d = Math.sqrt(R()) * ISL, x = CX + Math.cos(a) * d, y = CY + Math.sin(a) * d, r = rnd(24, 48); if (okSpot(x, y, r)) M.circles.push({ x, y, r, t: 'rock' }); }
+  for (let i = 0; i < Math.round((kind === 'br' ? 200 : 120) * k2); i++) { const a = rnd(0, 6.283), d = Math.sqrt(R()) * ISL * .92, x = CX + Math.cos(a) * d, y = CY + Math.sin(a) * d; if (okSpot(x, y, 16)) addLoot(x, y, 0, 0, false); }
   S.buildGrid(M);
   return M;
 };
 S.dirName = function (ang) { const d = ['동', '남동', '남', '남서', '서', '북서', '북', '북동']; let i = Math.round(((ang % 6.283) + 6.283) % 6.283 / (Math.PI / 4)) % 8; return d[i]; };
 S.serialize = function (M) {
   const r = n => Math.round(n);
-  return JSON.stringify({ seed: M.seed, walls: M.walls.map(w => [r(w.x), r(w.y), r(w.w), r(w.h), w.f, w.win]), circles: M.circles.map(c => [r(c.x), r(c.y), r(c.r), c.t]), lakes: M.lakes, towns: M.towns, blds: M.blds, portals: M.portals, roads: M.roads, extracts: M.extracts, tps: M.tps });
+  return JSON.stringify({ seed: M.seed, kind: M.kind, W: M.W, CX: M.CX, CY: M.CY, R: M.R, walls: M.walls.map(w => [r(w.x), r(w.y), r(w.w), r(w.h), w.f, w.win]), circles: M.circles.map(c => [r(c.x), r(c.y), r(c.r), c.t]), lakes: M.lakes, towns: M.towns, blds: M.blds, portals: M.portals, roads: M.roads, extracts: M.extracts, tps: M.tps, entries: M.entries, dungeons: M.dungeons.map(d => ({ name: d.name, tier: d.tier, x: d.x, y: d.y, s: d.s })) });
 };
 S.hydrate = function (o) {
   const M = Object.assign({}, o);
@@ -320,7 +385,7 @@ S.hydrate = function (o) {
   S.buildGrid(M); return M;
 };
 S.buildGrid = function (M) {
-  const C = S.CELL, gw = Math.ceil(S.W / C); M.gw = gw; M.cells = new Array(gw * gw).fill(null);
+  const C = S.CELL, gw = Math.ceil(M.W / C); M.gw = gw; M.cells = new Array(gw * gw).fill(null);
   const add = (x0, y0, x1, y1, key, o) => {
     const a = Math.max(0, Math.floor(x0 / C)), b = Math.min(gw - 1, Math.floor(x1 / C)), c = Math.max(0, Math.floor(y0 / C)), d = Math.min(gw - 1, Math.floor(y1 / C));
     for (let cy = c; cy <= d; cy++) for (let cx = a; cx <= b; cx++) { const i = cy * gw + cx; if (!M.cells[i]) M.cells[i] = { w: [], c: [] }; M.cells[i][key].push(o); }
@@ -328,10 +393,11 @@ S.buildGrid = function (M) {
   for (const w of M.walls) add(w.x, w.y, w.x + w.w, w.y + w.h, 'w', w);
   for (const c of M.circles) add(c.x - c.r, c.y - c.r, c.x + c.r, c.y + c.r, 'c', c);
 };
+S.levelOf = function (xp) { let l = 1, need = 300; xp = Math.max(0, xp || 0); while (xp >= need && l < 99) { xp -= need; l++; need = 300 + (l - 1) * 120; } return { l, cur: Math.floor(xp), need }; };
 // 원형 엔티티 충돌 해소. p={x,y}
 S.resolve = function (M, p, r, f) {
-  const dx = p.x - S.CX, dy = p.y - S.CY, d = Math.hypot(dx, dy), lim = S.ISLAND - r;
-  if (d > lim) { p.x = S.CX + dx / d * lim; p.y = S.CY + dy / d * lim; }
+  const dx = p.x - M.CX, dy = p.y - M.CY, d = Math.hypot(dx, dy), lim = M.R - r;
+  if (d > lim) { p.x = M.CX + dx / d * lim; p.y = M.CY + dy / d * lim; }
   for (const l of M.lakes) { const ex = p.x - l.x, ey = p.y - l.y, dd = Math.hypot(ex, ey), m = l.r + r; if (dd < m) { if (dd > .01) { p.x = l.x + ex / dd * m; p.y = l.y + ey / dd * m; } else p.x += m; } }
   const C = S.CELL, gw = M.gw;
   for (let it = 0; it < 2; it++) {
