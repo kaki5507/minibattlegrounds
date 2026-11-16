@@ -25,6 +25,59 @@ S.WEAPONS = {
   sniper: { n: '저격총', dmg: 110, iv: 1500, mag: 5, rl: 2900, spd: 1750, rng: 1700, sp: .1, rc: 12, rmax: 20, rr: 8, pel: 1, am: 'sniper', auto: 0, mv: .85, c: '#ce93d8', scope: 1 },
   lmg: { n: '경기관총', dmg: 19, iv: 82, mag: 60, rl: 4300, spd: 700, rng: 760, sp: 2.5, rc: 1.3, rmax: 22, rr: 9, pel: 1, am: 'rifle', auto: 1, mv: .82, c: '#ef9a9a' },
 };
+// ───────── 조합 무기 (원랜디식 조합표) ─────────
+// 필드 순서: n, dmg, iv, mag, rl, spd, rng, sp, rc, rmax, rr, pel, am, auto, mv, c, look, 기타
+(function () {
+  const D = (n, dmg, iv, mag, rl, spd, rng, sp, rc, rmax, rr, pel, am, auto, mv, c, look, ex) => Object.assign({ n, dmg, iv, mag, rl, spd, rng, sp, rc, rmax, rr, pel, am, auto, mv, c, look, craft: 1 }, ex || {});
+  const C = {
+    dual: D('쌍권총', 18, 150, 24, 1400, 640, 620, 2.4, 2.0, 12, 16, 1, 'light', 0, 1, '#e8eaed', 'pistol', { dual: 1, inf: 1, t: 2 }),
+    mp: D('머신피스톨', 11, 55, 25, 1200, 600, 480, 3.5, 1.6, 14, 15, 1, 'light', 1, 1.02, '#9fd3ff', 'pistol', { t: 2 }),
+    sawed: D('소드오프', 12, 550, 2, 1300, 540, 250, 8, 8, 14, 12, 8, 'shell', 0, 1.02, '#ffb59a', 'pistol', { t: 2 }),
+    carbine: D('카빈', 19, 110, 30, 1700, 760, 720, 1.6, 2.0, 13, 14, 1, 'rifle', 1, .98, '#b9e6a8', 'smg', { t: 2 }),
+    magnum: D('매그넘', 52, 420, 6, 1600, 900, 820, 1.0, 5.5, 14, 12, 1, 'rifle', 0, .98, '#d7c08a', 'pistol', { t: 2 }),
+    handcannon: D('핸드캐논', 85, 800, 3, 1800, 1300, 950, .6, 9, 18, 10, 1, 'sniper', 0, .96, '#c9a7e8', 'pistol', { t: 2 }),
+    drumpistol: D('드럼권총', 16, 85, 45, 2200, 700, 620, 2.4, 1.6, 16, 13, 1, 'rifle', 1, .95, '#f2a3a3', 'smg', { t: 2 }),
+    dualsmg: D('쌍기관단총', 13, 42, 60, 2000, 600, 500, 4.5, 1.5, 18, 14, 1, 'light', 1, .96, '#7ec4ff', 'smg', { dual: 1, t: 2 }),
+    pdw: D('PDW', 16, 72, 40, 1600, 680, 600, 2.2, 1.4, 13, 15, 1, 'light', 1, .98, '#8ad0d6', 'smg', { t: 2 }),
+    autosg: D('자동샷건', 9, 230, 12, 2400, 540, 320, 7, 5, 16, 11, 6, 'shell', 1, .95, '#ff9e80', 'sg', { t: 2 }),
+    burst: D('전투카빈', 28, 150, 20, 1900, 900, 850, 1.0, 2.6, 13, 12, 1, 'rifle', 1, .94, '#c5e1a5', 'ar', { t: 2 }),
+    vss: D('특수소총', 36, 180, 15, 1900, 950, 950, .9, 2.5, 13, 12, 1, 'sniper', 1, .94, '#b0bec5', 'dmr', { sil: 1, t: 2 }),
+    buzzsaw: D('톱날기관총', 12, 36, 100, 3500, 620, 560, 4, 1.1, 24, 10, 1, 'light', 1, .86, '#80deea', 'lmg', { t: 2 }),
+    heavyar: D('강화소총', 25, 95, 40, 2000, 780, 840, 1.3, 2.4, 16, 12, 1, 'rifle', 1, .93, '#aed581', 'ar', { t: 2 }),
+    sgrifle: D('산탄소총', 13, 320, 10, 2200, 600, 420, 5, 4, 15, 11, 5, 'shell', 1, .94, '#ffccbc', 'ar', { t: 2 }),
+    battle: D('전투소총', 32, 140, 20, 2000, 950, 950, .9, 2.8, 13, 12, 1, 'rifle', 1, .93, '#dce775', 'ar', { t: 2 }),
+    marksman: D('정밀소총', 62, 320, 10, 2400, 1500, 1300, .4, 5, 14, 10, 1, 'sniper', 0, .9, '#e1bee7', 'dmr', { scope: 1, t: 2 }),
+    saw: D('분대지원화기', 22, 72, 100, 4500, 720, 800, 2.2, 1.2, 22, 9, 1, 'rifle', 1, .8, '#ef9a9a', 'lmg', { t: 2 }),
+    mmg: D('중형기관총', 30, 95, 60, 4200, 950, 950, 1.6, 2.2, 20, 9, 1, 'rifle', 1, .75, '#e57373', 'lmg', { t: 2 }),
+    twindmr: D('연사저격소총', 46, 240, 15, 2300, 1150, 1150, .6, 4, 13, 10, 1, 'rifle', 0, .9, '#ffe082', 'dmr', { t: 2 }),
+    antimat: D('대물저격총', 165, 1800, 3, 3200, 2200, 1900, .08, 14, 22, 7, 1, 'sniper', 0, .82, '#b39ddb', 'sniper', { scope: 1, t: 2 }),
+    slug: D('슬러그샷건', 70, 700, 6, 2400, 1000, 620, .8, 8, 16, 10, 1, 'shell', 0, .95, '#ffab91', 'sg', { t: 2 }),
+    doublebarrel: D('쌍열샷건', 11, 900, 2, 2000, 540, 300, 9, 10, 16, 10, 12, 'shell', 0, .97, '#ff8a65', 'sg', { t: 2 }),
+    dartgun: D('다트건', 30, 850, 4, 2400, 1400, 900, 1.6, 7, 16, 10, 4, 'sniper', 0, .92, '#ce93d8', 'sniper', { t: 2 }),
+    drumsg: D('드럼샷건', 10, 260, 20, 3200, 540, 330, 7, 5, 18, 10, 7, 'shell', 1, .88, '#ffa726', 'sg', { t: 2 }),
+    railgun: D('레일건', 230, 2400, 1, 3000, 4000, 2400, .02, 16, 22, 6, 1, 'sniper', 0, .8, '#80d8ff', 'sniper', { scope: 1, t: 2 }),
+    hmg: D('중기관총', 38, 120, 50, 4800, 1300, 1100, 1.8, 3, 24, 8, 1, 'sniper', 1, .72, '#bcaaa4', 'lmg', { t: 2 }),
+    minigun: D('미니건', 14, 38, 200, 6000, 700, 760, 3, .7, 18, 10, 1, 'rifle', 1, .65, '#90a4ae', 'lmg', { t: 2 }),
+    golddual: D('황금 쌍권총', 32, 150, 24, 1300, 750, 720, 1.8, 2.2, 12, 16, 1, 'light', 0, 1, '#ffd54f', 'pistol', { dual: 1, inf: 1, t: 3 }),
+    gunkata: D('건카타', 16, 45, 60, 1800, 650, 560, 3.2, 1.3, 15, 15, 1, 'light', 1, 1.02, '#ffe57f', 'smg', { dual: 1, t: 3 }),
+    legend: D('전설의 저격총', 260, 1500, 3, 2800, 4200, 2600, .02, 14, 20, 7, 1, 'sniper', 0, .86, '#ffd740', 'sniper', { scope: 1, t: 3 }),
+    destroyer: D('파괴자', 18, 34, 300, 6500, 720, 800, 2.6, .6, 16, 10, 1, 'rifle', 1, .6, '#ffab40', 'lmg', { t: 3 }),
+  };
+  S.CRAFTED = C;
+  S.RECIPES = {};
+  S.RECIPE_SRC = {};
+  const R = (a, b, c) => { S.RECIPES[[a, b].sort().join('+')] = c; S.RECIPE_SRC[[a, b].sort().join('+')] = [a, b]; };
+  R('pistol', 'pistol', 'dual'); R('pistol', 'smg', 'mp'); R('pistol', 'sg', 'sawed'); R('pistol', 'ar', 'carbine'); R('pistol', 'dmr', 'magnum'); R('pistol', 'sniper', 'handcannon'); R('pistol', 'lmg', 'drumpistol');
+  R('smg', 'smg', 'dualsmg'); R('smg', 'ar', 'pdw'); R('smg', 'sg', 'autosg'); R('smg', 'dmr', 'burst'); R('smg', 'sniper', 'vss'); R('smg', 'lmg', 'buzzsaw');
+  R('ar', 'ar', 'heavyar'); R('ar', 'sg', 'sgrifle'); R('ar', 'dmr', 'battle'); R('ar', 'sniper', 'marksman'); R('ar', 'lmg', 'saw');
+  R('dmr', 'dmr', 'twindmr'); R('dmr', 'sniper', 'antimat'); R('dmr', 'sg', 'slug'); R('dmr', 'lmg', 'mmg');
+  R('sg', 'sg', 'doublebarrel'); R('sg', 'sniper', 'dartgun'); R('sg', 'lmg', 'drumsg');
+  R('sniper', 'sniper', 'railgun'); R('sniper', 'lmg', 'hmg'); R('lmg', 'lmg', 'minigun');
+  R('dual', 'dual', 'golddual'); R('dual', 'dualsmg', 'gunkata'); R('railgun', 'antimat', 'legend'); R('minigun', 'saw', 'destroyer');
+})();
+Object.assign(S.WEAPONS, S.CRAFTED); S.WEAPONS.pistol.inf = 1;
+S.recipeOf = function (a, b) { return S.RECIPES[[a, b].sort().join('+')] || null; };
+
 S.AMMO = { light: '경량탄', rifle: '소총탄', shell: '산탄', sniper: '저격탄' };
 S.ATT = {
   sup: { n: '소음기', slot: 'muzzle', m: { dmg: .92, rng: .9 }, sil: 1, d: '총소리 숨김 / 피해·사거리↓' },
@@ -46,7 +99,7 @@ S.stats = function (w) {
   if (!w) return null;
   const b = w.base || S.WEAPONS[w.id];
   const s = Object.assign({}, b);
-  s.scope = b.scope || 0; s.sil = 0;
+  s.scope = b.scope || 0; s.sil = b.sil || 0;
   for (const k of S.SLOTS) {
     const a = w.att && w.att[k] && S.ATT[w.att[k]]; if (!a) continue;
     for (const key in a.m) s[key] *= a.m[key];
@@ -130,6 +183,7 @@ S.COLORS = {
 // ───────── 경제 (타르코프식 창고/상인) ─────────
 S.PRICE = { w: { pistol: 300, smg: 900, ar: 1800, dmr: 2400, sg: 1200, sniper: 3600, lmg: 3000, hyb: 3200 }, ar: [0, 600, 1500, 3200], am: { light: 4, rifle: 8, shell: 10, sniper: 30 },
   it: { med: 400, band: 80, gren: 350, flash: 250, smoke: 200, fuel: 150 }, att: 450 };
+(function () { const P = S.PRICE.w; let changed = true; while (changed) { changed = false; for (const k in S.RECIPES) { const id = S.RECIPES[k]; if (P[id]) continue; const [a, b] = k.split('+'); if (P[a] && P[b]) { P[id] = Math.round((P[a] + P[b]) * 1.3); changed = true; } } } })();
 S.itemPrice = function (it) {
   if (!it) return 0;
   if (it.k === 'w') { const w = it.w || {}; return (S.PRICE.w[w.id] || 1000) + Object.keys(w.att || {}).length * S.PRICE.att; }

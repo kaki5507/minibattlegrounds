@@ -142,4 +142,18 @@ function ranking() {
   rankCache = { total: all.length, xp: top(a => a.xp || 0, true), wins: top(a => a.stats.wins), ext: top(a => a.stats.ext), val: top(a => a.stats.val), kills: top(a => a.stats.kills) };
   rankAt = Date.now(); return rankCache;
 }
-module.exports = { ranking, touchRank, equipFromRaid, init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };
+// 창고에서 무기 두 개 조합
+function craft(a, i, j) {
+  const A = a.stash[i], B = a.stash[j];
+  if (i === j || !A || !B || A.k !== 'w' || B.k !== 'w') return '창고의 무기 두 개를 고르세요';
+  const rid = S.recipeOf(A.w.id, B.w.id);
+  let w;
+  if (rid) w = { id: rid, att: {} };
+  else { const mk = x => { const o = { id: x.w.id, att: Object.assign({}, x.w.att), base: x.w.base || null }; return o; }; w = { id: 'hyb', att: {}, base: S.hybrid(mk(A), mk(B)) }; }
+  const atts = [].concat(Object.values(A.w.att || {}), Object.values(B.w.att || {}));
+  for (const k of [Math.max(i, j), Math.min(i, j)]) a.stash.splice(k, 1);
+  a.stash.push({ k: 'w', w });
+  for (const d of atts) addToStash(a, { k: 'att', d });
+  persist(a); return null;
+}
+module.exports = { craft, ranking, touchRank, equipFromRaid, init, register, login, byToken, logout, view, isTaken, validName, persist, addToStash, moveToKit, moveToStash, sell, buy, keyOf, flush, STASH_MAX };

@@ -40,7 +40,7 @@ const PEACE_MS = 60000, RAID_MS = 25 * 60000;
 function newW(id, base) { const w = { id, att: {}, base: base || null, mag: 0 }; w.st = S.stats(w); w.mag = w.st.mag; return w; }
 function restat(w) { w.st = S.stats(w); }
 function wscore(w) { if (!w) return 0; const s = w.st; return s.dmg * s.pel * 1000 / s.iv * Math.min(1, s.rng / 700) * (s.scope ? 1.2 : 1); }
-const INF = w => w && w.id === 'pistol'; // 권총은 무한 탄약
+const INF = w => !!(w && w.st && w.st.inf); // 권총·쌍권총 계열은 무한 탄약
 const AMCAP = { light: 300, rifle: 300, shell: 60, sniper: 40 };
 
 // ───────── 루팅 테이블 ─────────
@@ -800,10 +800,11 @@ class Room {
       case 'closeloot': e.lootBox = null; break;
       case 'dropw': if (alive) this.dropW(e, m.i ? 1 : 0); break;
       case 'craft': if (alive && e.w[0] && e.w[1]) {
-        const base = S.hybrid(e.w[0], e.w[1]);
-        for (const w of e.w) { e.am[w.st.am] += w.mag; for (const k in w.att) if (e.bag.length < 6) e.bag.push(w.att[k]); }
-        const nw = newW('hyb', base); nw.mag = 0; e.w = [nw, null]; e.cw = 0; e.rlOn = false; this.reload(e, now);
-        this.evs.push({ e: 'msg', txt: `조합 완료: ${base.n}`, to: e.id });
+        const rid = S.recipeOf(e.w[0].id, e.w[1].id);
+        for (const w of e.w) { if (!INF(w)) e.am[w.st.am] += w.mag; for (const k in w.att) if (e.bag.length < 6) e.bag.push(w.att[k]); }
+        const nw = rid ? newW(rid) : newW('hyb', S.hybrid(e.w[0], e.w[1])); nw.mag = 0; e.w = [nw, null]; e.cw = 0; e.rlOn = false; this.reload(e, now);
+        if (!e.w[1] && this.world) { e.w[1] = newW('pistol'); e.w[1].free = 1; }
+        this.evs.push({ e: 'msg', txt: `조합 완료: ${nw.st.n}${rid ? '' : ' (조합표에 없는 조합 → 개조총)'}`, to: e.id });
       } break;
       case 'equip': { const id = e.bag[m.b], w = e.w[m.i ? 1 : 0]; if (id && w) { const sl = S.ATT[id].slot; e.bag.splice(m.b, 1); if (w.att[sl]) e.bag.push(w.att[sl]); w.att[sl] = id; restat(w); w.mag = Math.min(w.mag, w.st.mag); } } break;
       case 'detach': { const w = e.w[m.i ? 1 : 0]; if (w && w.att[m.s] && e.bag.length < 6) { e.bag.push(w.att[m.s]); delete w.att[m.s]; restat(w); if (w.mag > w.st.mag) { e.am[w.st.am] += w.mag - w.st.mag; w.mag = w.st.mag; } } } break;
@@ -927,6 +928,7 @@ wss.on('connection', ws => {
         else if (m.op === 'unkit') err = ACC.moveToStash(c.acc, +m.i, Math.max(0, Math.floor(+m.n || 0)));
         else if (m.op === 'sell') err = ACC.sell(c.acc, +m.i, m.from);
         else if (m.op === 'buy') err = ACC.buy(c.acc, String(m.id));
+        else if (m.op === 'craft') err = ACC.craft(c.acc, +m.i, +m.j);
         if (err) send(c, JSON.stringify({ t: 'err', txt: err }));
         sendAcc(c); break;
       }

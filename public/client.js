@@ -219,14 +219,15 @@ function itemCard(it, i, from, acts) {
   const key = from + ':' + i;
   return `<div class="itm ${stOpen === key ? 'open' : ''}" style="--c:${ICOL[it.k] || '#3a444e'}" data-it="${key}"><span class="pr">${S.itemPrice(it).toLocaleString()}</span><b>${esc(S.itemName(it))}</b><small>${esc(itemSub(it))}</small><div class="act">${acts}</div></div>`;
 }
-function openStash() { if (!acct) return openAuth('login'); stOpen = null; renderStash(); $('stashm').classList.add('on'); }
+function openStash() { if (!acct) return openAuth('login'); stOpen = null; stCraft = null; renderStash(); $('stashm').classList.add('on'); }
 function renderStash() {
   if (!acct) return;
   const A = acct, kitW = A.kit.filter(x => x.k === 'w').length, kitA = A.kit.filter(x => x.k === 'ar').length;
   const kitVal = A.kit.reduce((s, it) => s + S.itemPrice(it), 0);
   let left;
   if (stTab === 'stash') {
-    left = `<div class="lbl"><span>창고 ${A.stash.length} / ${A.max}</span><span>누르면 메뉴</span></div><div class="items">${A.stash.map((it, i) => itemCard(it, i, 'stash', `${it.k !== 'val' ? '<button class="y" data-op="kit">반입</button>' : ''}<button class="g" data-op="sell">판매 ${Math.floor(S.itemPrice(it) * .5).toLocaleString()}</button>`)).join('') || '<div class="empty">창고가 비었습니다. 상인에게 사거나 탈출에 성공해 채우세요.</div>'}</div>`;
+    const cw = stCraft !== null && A.stash[stCraft] && A.stash[stCraft].k === 'w' ? A.stash[stCraft] : (stCraft = null);
+    left = `<div class="lbl"><span>창고 ${A.stash.length} / ${A.max}</span><span><button class="g" id="rcpS" style="padding:3px 9px">조합표</button></span></div>${cw ? `<div class="kitnote" style="margin:0 0 8px;border-color:var(--acc)">조합 재료: <b>${esc(S.itemName(cw))}</b> · 합칠 다른 무기를 눌러 <b>이 총과 조합</b>을 고르세요.</div>` : ''}<div class="items">${A.stash.map((it, i) => itemCard(it, i, 'stash', `${it.k !== 'val' ? '<button class="y" data-op="kit">반입</button>' : ''}${it.k === 'w' ? `<button class="g" data-op="cr">${stCraft === i ? '선택 해제' : stCraft !== null ? '이 총과 조합' : '조합 재료'}</button>` : ''}<button class="g" data-op="sell">판매 ${Math.floor(S.itemPrice(it) * .5).toLocaleString()}</button>`)).join('') || '<div class="empty">창고가 비었습니다. 상인에게 사거나 탈출에 성공해 채우세요.</div>'}</div>`;
   } else {
     const cats = {}; S.SHOP.forEach(p => (cats[p.cat] = cats[p.cat] || []).push(p));
     left = `<div class="lbl"><span>상인</span><span>구매한 물건은 창고로</span></div>${Object.entries(cats).map(([c, ps]) => `<div class="ccat">${c}</div><div class="items">${ps.map(p => `<div class="itm" style="--c:${ICOL[p.item.k]}" data-buy="${p.id}"><span class="pr" style="color:${A.money >= p.price ? 'var(--acc)' : 'var(--red)'}">${p.price.toLocaleString()}</span><b>${esc(S.itemName(p.item))}</b><small>${esc(itemSub(p.item))}</small></div>`).join('')}</div>`).join('')}`;
@@ -244,9 +245,17 @@ function renderStash() {
     if (op === 'kit') sendM({ t: 'stash', op: 'kit', i: +i });
     else if (op === 'unkit') sendM({ t: 'stash', op: 'unkit', i: +i });
     else if (op === 'sell') sendM({ t: 'stash', op: 'sell', i: +i, from });
+    else if (op === 'cr') {
+      if (stCraft === null) { stCraft = +i; stOpen = null; renderStash(); return; }
+      if (stCraft === +i) { stCraft = null; renderStash(); return; }
+      const a = A.stash[stCraft].w.id, b = A.stash[+i].w.id, r = S.recipeOf(a, b);
+      if (confirm(`${wName(a)} + ${wName(b)} = ${r ? S.WEAPONS[r].n : '개조총'}\n두 무기가 사라지고 새 무기가 창고에 들어갑니다. 조합할까요?`)) { sendM({ t: 'stash', op: 'craft', i: stCraft, j: +i }); stCraft = null; }
+      else return;
+    }
     else { stOpen = stOpen === d.dataset.it ? null : d.dataset.it; renderStash(); return; }
     stOpen = null;
   });
+  if ($('rcpS')) $('rcpS').onclick = openRecipes;
   $('stashBox').querySelectorAll('[data-buy]').forEach(d => d.onclick = () => sendM({ t: 'stash', op: 'buy', id: d.dataset.buy }));
 }
 
@@ -346,7 +355,7 @@ function gunCol(gs, wid, x0, len, c) {
   return '#3a3f44';
 }
 function drawGun(c, wid, gs, am, kick) {
-  const g = GUNS[wid] || GUNS.ar; const W = S.WEAPONS[wid];
+  const W = S.WEAPONS[wid]; const g = GUNS[wid] || GUNS[W && W.look] || GUNS.ar;
   const x0 = (g.two ? 16 : 10) - kick, y0 = g.two ? 0 : 6, L = g.L, w = g.w;
   // 개머리판
   if (g.st) { c.fillStyle = '#4e342e'; c.fillRect(x0 - g.st, y0 - w * .4, g.st + 1, w * .8); }
@@ -444,7 +453,10 @@ function drawChar(c, x, y, a, skin, t, moving, flags, wid, alpha, opt) {
   ell(c, -4 + fo, -9, 5, 3.5); ell(c, -4 - fo, 9, 5, 3.5);
   // 손 + 총
   const handCol = ['man', 'woman'].includes(kind) ? '#ffcc80' : hc;
-  if (wid) {
+  const DW = wid && S.WEAPONS[wid];
+  if (DW && DW.dual) {
+    for (const oy of [-8, 8]) { c.save(); c.translate(0, oy); const g = drawGun(c, wid, skin.gskin, opt.am || 0, opt.kick || 0); c.restore(); drawHand(c, g.x0 + 2, (g.two ? 0 : g.y0) + oy + 1, skin.glove, handCol, t); }
+  } else if (wid) {
     const g = drawGun(c, wid, skin.gskin, opt.am || 0, opt.kick || 0);
     if (g.two) { drawHand(c, g.x0 + 1, -2.5, skin.glove, handCol, t); drawHand(c, g.x0 + 1, 3.5, skin.glove, handCol, t); }
     else { drawHand(c, g.x0 + 3, g.y0 + 1, skin.glove, handCol, t); const fx = opt.rl ? g.x0 + g.L * .34 : g.x0 + g.L * .55, fy = opt.rl ? g.y0 + 8 + Math.sin(t * 12) * 2 : g.y0 - 1; drawHand(c, fx, fy, skin.glove, handCol, t); }
@@ -772,6 +784,30 @@ function drawMapOverlay(x, k, s, big) {
   const me = G.me; if (me) { const px = (G.local && me.st === 'a' ? G.local.x : me.vx) * k, py = (G.local && me.st === 'a' ? G.local.y : me.vy) * k; x.fillStyle = '#ffd54f'; x.beginPath(); x.arc(px, py, big ? 6 * D : 3.5, 0, 6.283); x.fill(); x.strokeStyle = '#ffd54f'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(lastAim) * 12, py + Math.sin(lastAim) * 12); x.stroke(); }
 }
 
+// ───────── 조합 ─────────
+const TIERN = { 1: '기본', 2: '2단계', 3: '3단계' };
+function wLine(id) { const W = S.WEAPONS[id]; if (!W) return ''; return `피해 ${Math.round(W.dmg * W.pel)} · ${Math.round(60000 / W.iv)}RPM · 사거리 ${W.rng} · 탄창 ${W.mag} · ${W.inf ? '무한 탄약' : S.AMMO[W.am]}${W.dual ? ' · 쌍수' : ''}${W.sil ? ' · 무소음' : ''}${W.scope ? ' · 조준경' : ''}`; }
+function wName(id) { return (S.WEAPONS[id] || {}).n || id; }
+function craftPreview(a, b) {
+  if (!a || !b) return '<div style="font-size:12px;color:var(--tx2);margin:6px 0 8px">무기 두 개를 들고 있으면 합칠 수 있습니다. 조합표에 있는 조합이면 새 무기가 되고, 탄약은 재료 총의 탄을 그대로 씁니다.</div>';
+  if (a === 'hyb' || b === 'hyb') return '<div style="font-size:12px;color:var(--tx2);margin:6px 0 8px">개조총은 조합표 재료가 아닙니다. 다른 총과 합치면 다시 개조총이 됩니다.</div>';
+  const r = S.recipeOf(a, b);
+  if (!r) return `<div style="font-size:12px;color:var(--tx2);margin:6px 0 8px">${esc(wName(a))} + ${esc(wName(b))} = <b>개조총</b> (조합표에 없는 조합) · 피해·사거리는 오르고 반동·재장전이 나빠집니다.</div>`;
+  const W = S.WEAPONS[r];
+  return `<div style="font-size:12px;color:var(--tx2);margin:6px 0 8px">${esc(wName(a))} + ${esc(wName(b))} = <b style="color:${W.c}">${esc(W.n)}</b> <span class="tag">${TIERN[W.t] || ''}</span><br>${wLine(r)}<br><span style="color:var(--tx3)">부착물은 가방으로 돌아갑니다.</span></div>`;
+}
+function openRecipes() {
+  const rows = Object.entries(S.RECIPES).map(([k, r]) => ({ k, r, W: S.WEAPONS[r], src: S.RECIPE_SRC[k] })).sort((x, y) => x.W.t - y.W.t);
+  let h = `<div class="row" style="justify-content:space-between"><h3>조합표 <small>${rows.length}가지 · 순서 상관없음</small></h3><button class="g" id="rcpX">닫기</button></div>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:8px">조합한 총은 재료 총이 쓰던 탄약을 그대로 씁니다. 새 탄약을 따로 모을 필요가 없습니다. 3단계는 조합한 총끼리 다시 합쳐야 나옵니다.</div>`;
+  for (const t of [2, 3]) {
+    h += `<div class="ccat">${TIERN[t]}</div>`;
+    for (const o of rows.filter(x => x.W.t === t)) { const [a, b] = o.src; h += `<div class="wcard" style="padding:8px 10px;margin:4px 0"><div><span style="color:var(--tx2)">${esc(wName(a))} + ${esc(wName(b))}</span> → <b style="color:${o.W.c}">${esc(o.W.n)}</b></div><div style="font-size:11.5px;color:var(--tx3);margin-top:2px">${wLine(o.r)}</div></div>`; }
+  }
+  $('rcpBox').innerHTML = h; $('rcpm').classList.add('on'); $('rcpX').onclick = () => $('rcpm').classList.remove('on');
+}
+let stCraft = null;
+
 // ───────── 가방 ─────────
 function openInv() {
   if (!G || !G.me) return; const me = G.me;
@@ -783,7 +819,7 @@ function openInv() {
   };
   $('invBox').innerHTML = `<div class="row" style="justify-content:space-between"><h3>가방 <small>무기·부착물·소모품</small></h3><button class="g" id="invX">닫기</button></div>
    ${me.w.map(wcard).join('')}
-   <div class="wcard"><b>무기 조합</b><div style="font-size:12px;color:var(--tx2);margin:4px 0 8px">두 무기를 합쳐 개조총을 만듭니다. 피해·사거리는 오르고 반동·퍼짐·재장전이 나빠집니다. 부착물은 가방으로 옮겨집니다.</div><button class="y" id="craftB" ${me.w[0] && me.w[1] ? '' : 'disabled'}>조합하기</button></div>
+   <div class="wcard"><div class="row" style="justify-content:space-between"><b>무기 조합</b><button class="g" id="rcpB" style="padding:4px 10px">조합표</button></div>${craftPreview(me.w[0] && me.w[0].id, me.w[1] && me.w[1].id)}<button class="y" id="craftB" ${me.w[0] && me.w[1] ? '' : 'disabled'}>조합하기</button></div>
    <div class="wcard"><b>부착물 ${me.bag.length}/6</b><div style="font-size:12px;color:var(--tx3);margin-bottom:4px">누르면 들고 있는 무기에 장착</div>${me.bag.map((a, i) => `<div style="margin:3px 0"><span class="att on" data-eq="${i}">${S.ATT[a].n}</span><small style="color:var(--tx3)"> ${S.ATT[a].d}</small> <button class="g" data-da="${i}" style="padding:3px 8px">버리기</button></div>`).join('') || '<div style="color:var(--tx3)">없음</div>'}</div>
    <div class="wcard" style="font-size:13px;line-height:1.8;color:var(--tx2)">${me.ar ? `${me.ar}레벨 방어구 · 내구 ${me.ad}` : '방어구 없음'}<br>탄약: ${Object.entries(me.am).map(([k, v]) => `${S.AMMO[k]} ${v}`).join(' · ')}<br>소모품: ${Object.entries(me.it).map(([k, v]) => `${S.ITEMN[k]} ${v}`).join(' · ')}${G.world ? `<br>전리품 가치: <b style="color:var(--acc)">${me.val}</b>` : ''}</div>`;
   $('inv').classList.add('on');
@@ -796,6 +832,7 @@ function openInv() {
   q('[data-eq]', el => sendM({ t: 'act', a: 'equip', b: +el.dataset.eq, i: me.cw }));
   q('[data-da]', el => sendM({ t: 'act', a: 'dropatt', b: +el.dataset.da }));
   const cb = $('craftB'); if (cb) cb.onclick = () => { sendM({ t: 'act', a: 'craft' }); setTimeout(openInv, 200); };
+  $('rcpB').onclick = openRecipes;
 }
 
 // ───────── 시야 다각형 ─────────
@@ -1090,7 +1127,7 @@ function interactLabel() {
   for (const v of G.vehs) if (!v[8] && me.f === 0 && v[6] < 4 && hyp(v[1] - x, v[2] - y) < 80) return '탑승';
   return null;
 }
-window.__dbg = () => G;
+window.__dbg = () => G; window.__t = { sendM: m => sendM(m), openStash, openInv, closeModal, acct: () => acct };
 requestAnimationFrame(frame);
 connect();
 })();
