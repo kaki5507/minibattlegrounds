@@ -1,4 +1,4 @@
-# 🦆 오리 배틀그라운드 (Duck Battlegrounds)
+# 🎯 미니 배틀그라운드 (Mini Battlegrounds)
 
 Escape from Duckov 느낌의 탑다운 웹 배틀로얄 + 타르코프식 탈출 모드입니다. 모바일(터치 조이스틱)과 PC(키보드·마우스)에서 같이 플레이할 수 있습니다.
 

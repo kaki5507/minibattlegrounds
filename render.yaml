@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: duck-battlegrounds
+    name: minibattlegrounds
     runtime: node
     plan: free
     buildCommand: npm install

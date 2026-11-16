@@ -1,4 +1,4 @@
-// 오리 배틀그라운드 클라이언트
+// 미니 배틀그라운드 클라이언트
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);

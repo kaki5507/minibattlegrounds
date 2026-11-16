@@ -1,4 +1,4 @@
-// 오리 배틀그라운드 - 권위 서버 (Node.js + ws)
+// 미니 배틀그라운드 - 권위 서버 (Node.js + ws)
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path');
 const WebSocket = require('ws');
@@ -63,7 +63,7 @@ const ZDPS = [0.6, 1.2, 2.2, 4, 7, 11, 16, 22];
 
 class Room {
   constructor(opts, host) {
-    this.id = nextRoomId++; this.name = (opts.name || '오리 배그 방').slice(0, 20); this.mode = opts.mode === 'ex' ? 'ex' : 'br';
+    this.id = nextRoomId++; this.name = (opts.name || '미니 배그 방').slice(0, 20); this.mode = opts.mode === 'ex' ? 'ex' : 'br';
     this.ts = [1, 2, 4].includes(+opts.ts) ? +opts.ts : 1; this.host = host; this.members = new Set(); this.st = 'lobby'; this.created = Date.now(); this.cd = null;
   }
   humans() { return [...this.members].map(id => clients.get(id)).filter(Boolean); }
@@ -696,4 +696,4 @@ setInterval(() => {
   for (const c of clients.values()) if (!c.room) send(c, list);
 }, 1000);
 
-server.listen(PORT, () => console.log('오리 배그 서버 실행중: http://localhost:' + PORT));
+server.listen(PORT, () => console.log('미니 배그 서버 실행중: http://localhost:' + PORT));
