@@ -355,6 +355,9 @@ S.genMap = function (seed, kind) {
     // 고정 탈출구: 해안 4곳 + 중앙 연구소 비상구
     for (let i = 0; i < 4; i++) { const a = i * 1.5708; for (let d = ISL - 300; d > ISL - 1200; d -= 50) { const x = CX + Math.cos(a) * d, y = CY + Math.sin(a) * d; if (!nearLake(x, y, 150) && !overlapsB(x - 110, y - 110, 220, 220, 0) && !inDungeon(x, y, 120)) { M.extracts.push({ x, y, r: 100, name: S.dirName(a) + '쪽 해안 탈출구' }); break; } } }
     { const c = freeCell(M.dungeons[0]); M.extracts.push({ x: c[0], y: c[1], r: 80, name: '연구소 비상 탈출구', risky: 1 }); }
+    // 포탈·입장 지점·탈출구 주변은 안전지대 (몬스터 스폰/접근 금지)
+    M.safe = M.portals.filter(p => p.kind === 'tp').map(p => ({ x: p.x, y: p.y, r: 420 })).concat(M.entries.map(e => ({ x: e.x, y: e.y, r: 520 })), M.extracts.map(e => ({ x: e.x, y: e.y, r: 380 })));
+    M.spawns = M.spawns.filter(sp => !M.safe.some(z => Math.hypot(z.x - sp.x, z.y - sp.y) < z.r + 120));
   }
   const nearRoad = (x, y, m) => M.roads.some(r => distSeg(x, y, r[0], r[1], r[2], r[3]) < m);
   for (const r of M.roads) { const t = rnd(.2, .8), x = r[0] + (r[2] - r[0]) * t, y = r[1] + (r[3] - r[1]) * t; if (inIsland(x, y, 100) && !nearLake(x, y, 60) && !overlapsB(x - 40, y - 40, 80, 80, 10) && !inDungeon(x, y, 60)) M.vehSpots.push({ x, y, a: Math.atan2(r[3] - r[1], r[2] - r[0]) }); }
@@ -376,7 +379,7 @@ S.genMap = function (seed, kind) {
 S.dirName = function (ang) { const d = ['동', '남동', '남', '남서', '서', '북서', '북', '북동']; let i = Math.round(((ang % 6.283) + 6.283) % 6.283 / (Math.PI / 4)) % 8; return d[i]; };
 S.serialize = function (M) {
   const r = n => Math.round(n);
-  return JSON.stringify({ seed: M.seed, kind: M.kind, W: M.W, CX: M.CX, CY: M.CY, R: M.R, walls: M.walls.map(w => [r(w.x), r(w.y), r(w.w), r(w.h), w.f, w.win]), circles: M.circles.map(c => [r(c.x), r(c.y), r(c.r), c.t]), lakes: M.lakes, towns: M.towns, blds: M.blds, portals: M.portals, roads: M.roads, extracts: M.extracts, tps: M.tps, entries: M.entries, dungeons: M.dungeons.map(d => ({ name: d.name, tier: d.tier, x: d.x, y: d.y, s: d.s })) });
+  return JSON.stringify({ seed: M.seed, kind: M.kind, W: M.W, CX: M.CX, CY: M.CY, R: M.R, walls: M.walls.map(w => [r(w.x), r(w.y), r(w.w), r(w.h), w.f, w.win]), circles: M.circles.map(c => [r(c.x), r(c.y), r(c.r), c.t]), lakes: M.lakes, towns: M.towns, blds: M.blds, portals: M.portals, roads: M.roads, extracts: M.extracts, tps: M.tps, entries: M.entries, safe: M.safe || [], dungeons: M.dungeons.map(d => ({ name: d.name, tier: d.tier, x: d.x, y: d.y, s: d.s })) });
 };
 S.hydrate = function (o) {
   const M = Object.assign({}, o);

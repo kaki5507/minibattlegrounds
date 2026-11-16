@@ -66,7 +66,24 @@ $('nm').value = save.name;
 $('nm').onchange = () => { save.name = $('nm').value.trim().slice(0, 12) || save.name; persist(); hello(); };
 const radio = n => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
 $('qBR').onclick = () => { hello(); sendM({ t: 'quick', mode: 'br' }); };
-$('qEX').onclick = () => { hello(); if (!acct) toast('로그인하면 탈출에 성공한 아이템이 창고에 저장됩니다'); sendM({ t: 'quick', mode: 'ex' }); };
+$('qEX').onclick = () => { renderRaid(); $('raidm').classList.add('on'); };
+const DGCOL = ['', '#cddc39', '#4fc3f7', '#b39ddb', '#ffb74d', '#ef5350'];
+let worldInfo = null;
+function fmtUp(sec) { const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60; return h ? `${h}시간 ${m}분` : `${m}분`; }
+function renderRaid() {
+  const w = worldInfo, box = $('raidBox'); if (!box) return;
+  const kitN = acct ? acct.kit.length : 0, kitV = acct ? acct.kit.reduce((a, it) => a + S.itemPrice(it), 0) : 0;
+  box.innerHTML = `<div class="row" style="justify-content:space-between"><div class="rlive">LIVE · 상시 운영 중</div><button class="g" id="raidX" style="padding:6px 12px">닫기</button></div>
+   <div class="rbig"><b>${w ? w.n : '-'}</b><span>명이 지금 레이드 중</span></div>
+   <div style="font-size:12px;color:var(--tx3)">${w ? `서버 가동 ${fmtUp(w.up)} · 입장 지점 16곳 · 고정 탈출구 5곳${w.drops ? ` · 보급 ${w.drops}개 투하됨` : ''}` : '현황을 불러오는 중'}</div>
+   <div class="dgl">${w ? w.dg.map(d => `<div class="dgr" style="--c:${DGCOL[d.tier]}"><div><b>${esc(d.name)}</b><small>위험도 ${'■'.repeat(d.tier)}${'□'.repeat(5 - d.tier)}</small></div><span class="gn">경비 ${d.g}</span><span class="pn">${d.n}<i>명</i></span></div>`).join('') + `<div class="dgr" style="--c:#5c656d"><div><b>던전 밖 (야외·오두막)</b><small>입장 지점과 포탈 주변은 몬스터가 오지 않는 안전지대</small></div><span class="gn"></span><span class="pn">${w.out}<i>명</i></span></div>` : ''}</div>
+   <div class="rkit">${acct ? (kitN ? `반입 장비 ${kitN}개 · ${kitV.toLocaleString()}원 상당 · 죽으면 모두 잃습니다` : '반입 장비가 없습니다. 권총 한 자루로 들어갑니다.') + ' <a href="#" id="raidKit" style="color:var(--acc)">창고에서 챙기기</a>' : '손님은 기본 권총으로 들어가고, 탈출해도 아이템이 저장되지 않습니다. <a href="#" id="raidLogin" style="color:var(--acc)">로그인</a>'}</div>
+   <button class="y" id="raidGo" style="width:100%;padding:14px;font-size:15px">지금 바로 입장</button>`;
+  $('raidX').onclick = () => closeModal('raidm');
+  $('raidGo').onclick = () => { closeModal('raidm'); hello(); sendM({ t: 'quick', mode: 'ex' }); };
+  const k = $('raidKit'); if (k) k.onclick = e => { e.preventDefault(); closeModal('raidm'); openStash(); };
+  const l = $('raidLogin'); if (l) l.onclick = e => { e.preventDefault(); closeModal('raidm'); openAuth('login'); };
+}
 $('mk').onclick = () => { hello(); sendM({ t: 'create', name: $('rname').value.trim() || ((acct ? acct.name : save.name) + '의 방'), ts: radio('rts'), pw: $('rpw').value }); };
 $('startBtn').onclick = () => sendM({ t: 'start' });
 $('leaveBtn').onclick = () => sendM({ t: 'leave' });
@@ -119,7 +136,8 @@ let lastRooms = [];
 function renderRooms(list) {
   lastRooms = list; const el = $('roomList');
   const wd = list.find(r => r.world); list = list.filter(r => !r.world);
-  const wHtml = wd ? `<div class="ri world"><div style="min-width:0"><div class="nm">레이드 월드 <span class="tag acc">상시 운영</span></div><div class="sub">던전 5개 · 고정 탈출구 5곳 · 아무 때나 입장 · ${wd.n}명 레이드 중</div></div><div class="cnt">${wd.n}<i>명</i></div><button class="b" data-world="1">입장</button></div>` : '';
+  if (wd) { worldInfo = wd; $('qEXn').textContent = `지금 ${wd.n}명 레이드 중 · 상시 운영`; if ($('raidm').classList.contains('on')) renderRaid(); }
+  const wHtml = wd ? `<div class="ri world"><div style="min-width:0"><div class="nm">레이드 월드 <span class="tag acc">상시 운영</span></div><div class="sub">상시 운영 · 던전 5개 · 아무 때나 입장${wd.n ? ` · ${wd.dg.filter(d => d.n).map(d => d.name + ' ' + d.n).join(', ') || '야외 ' + wd.out}` : ''}</div></div><div class="cnt">${wd.n}<i>명</i></div><button class="b" data-world="1">입장</button></div>` : '';
   if (!list.length) { el.innerHTML = wHtml + '<div class="empty">열린 배틀로얄 방이 없습니다.<br>빠른 입장을 누르거나 방을 직접 만들어 보세요.</div>'; const wb = el.querySelector('[data-world]'); if (wb) wb.onclick = () => $('qEX').onclick(); return; }
   el.innerHTML = list.map(r => `<div class="ri"><div style="min-width:0"><div class="nm">${r.lk ? '<span class="lock"></span>' : ''}${esc(r.name)}</div><div class="sub">배틀로얄 · ${TSN[r.ts]}${r.lk ? ' · 비공개' : ''}</div></div>
     <div class="cnt">${r.n}<i>/10</i></div>${r.st === 'play' ? '<span class="tag live">진행중</span>' : `<button class="${r.lk ? 'g' : ''}" data-j="${r.id}" data-lk="${r.lk}">입장</button>`}</div>`).join('');
@@ -539,7 +557,7 @@ function onResult(m) {
   if ($('toLobby')) $('toLobby').onclick = () => { $('res').classList.remove('on'); toast('게임이 끝나면 대기실로 돌아갑니다'); };
   $('toMenu').onclick = () => { $('res').classList.remove('on'); sendM({ t: 'leave' }); };
 }
-function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop', 'stashm', 'authm', 'pwm']) $(id).classList.remove('on'); }
+function closeModals() { for (const id of ['inv', 'res', 'bm', 'shop', 'stashm', 'authm', 'pwm', 'raidm']) $(id).classList.remove('on'); }
 
 // ───────── 입력 ─────────
 const cv = $('cv'), ctx = cv.getContext('2d');

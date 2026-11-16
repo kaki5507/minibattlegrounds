@@ -144,6 +144,12 @@ class Room {
     this.exts = this.M.extracts.slice(); this.dropTimes = [300000];
     this.M.spawns.forEach((sp, i) => { const e = this.mkGuard(sp, i === this.M.spawns.findIndex(q => q.tier === 5)); });
   }
+  inSafe(x, y, pad) { const Z = this.M.safe; if (!Z) return false; for (const z of Z) if (Math.hypot(z.x - x, z.y - y) < z.r + (pad || 0)) return true; return false; }
+  worldStatus() {
+    const hum = this.ents.filter(e => !e.bot && this.alive(e)), M = this.M;
+    const dg = M.dungeons.map(d => ({ name: d.name, tier: d.tier, n: hum.filter(h => Math.abs(h.x - d.x) < d.s / 2 && Math.abs(h.y - d.y) < d.s / 2).length, g: this.ents.filter(g => g.ai && g.ai.kind === 'guard' && this.alive(g) && Math.abs(g.x - d.x) < d.s / 2 && Math.abs(g.y - d.y) < d.s / 2).length }));
+    return { n: hum.length, dg, out: hum.length - dg.reduce((a, d) => a + d.n, 0), up: Math.round(this.time / 1000), drops: this.drops.filter(d => !d.open).length };
+  }
   mkGuard(sp, boss) {
     const g = GUARD[sp.tier];
     const e = this.mkEnt(boss ? '연구소 경비대장' : g.n, true, 9999, S.cleanSkin({ body: pick(['man', 'woman', 'dog', 'bear', 'robot']), hat: sp.tier >= 4 ? 'helmet' : pick(['cap', 'beret', 'beanie', 'none']), col: ['camo', 'black', 'green', 'black', 'white'][sp.tier - 1], face: pick(['mask', 'none', 'gasmask', 'nvg']), glove: 'tactical', bag: 'mil', gskin: 'none' }));
@@ -284,7 +290,6 @@ class Room {
 
   // ───── 메인 업데이트 ─────
   update(dt) {
-    if (this.world && !this.members.size) return;
     this.tick++;
     if (this.pre > 0) { this.pre -= dt * 1000; if (this.tick % 2 === 0) this.snapshot(); return; }
     this.time += dt * 1000; const now = this.time;
@@ -639,15 +644,17 @@ class Room {
       if (!peace) for (const o of this.ents) {
         if (o === e || o.team === e.team || !this.alive(o) || o.f !== e.f || o.car) continue;
         const d = hyp(o.x - e.x, o.y - e.y); if (d > (guard ? 560 : 620) || d >= bd) continue;
+        if (guard && this.inSafe(o.x, o.y)) continue;
         if (!this.canSee(e, o)) continue; best = o; bd = d;
       }
       if (best && (!B.tgt || B.tgt !== best.id)) { if (!B.tgt) B.react = now + rand(320, 680) * (guard ? 1.25 : 1); B.tgt = best.id; }
       if (!best && B.tgt) { const t = this.byId(B.tgt); if (!t || !this.alive(t) || hyp(t.x - e.x, t.y - e.y) > 900) B.tgt = null; else if (!this.canSee(e, t)) { B.goal = { x: t.x, y: t.y }; B.tgt = null; } }
-      if (guard && e.home && hyp(e.x - e.home.x, e.y - e.home.y) > 1100) { B.tgt = null; B.goal = { x: e.home.x, y: e.home.y }; }
+      if (guard && e.home && (hyp(e.x - e.home.x, e.y - e.home.y) > 1100 || this.inSafe(e.x, e.y, 40))) { B.tgt = null; B.goal = { x: e.home.x, y: e.home.y }; B.wait = now + 3000; }
+      if (guard && B.tgt) { const t0 = this.byId(B.tgt); if (t0 && this.inSafe(t0.x, t0.y)) { B.tgt = null; B.goal = { x: e.home.x, y: e.home.y }; } }
       if (!B.tgt && e.hp < 55 && !e.act) { if (e.it.med) this.startAct(e, 'med', 4000); else if (e.it.band && e.hp < 80) this.startAct(e, 'band', 1500); }
       const z = this.z;
       if (guard) {
-        if (!B.tgt && (!B.goal || hyp(B.goal.x - e.x, B.goal.y - e.y) < 40) && now > B.wait) { const a = rand(0, 6.283), d = rand(0, 320); B.goal = { x: e.home.x + Math.cos(a) * d, y: e.home.y + Math.sin(a) * d }; B.wait = now + rand(1500, 5000); }
+        if (!B.tgt && (!B.goal || hyp(B.goal.x - e.x, B.goal.y - e.y) < 40) && now > B.wait) { for (let i = 0; i < 8; i++) { const a = rand(0, 6.283), d = rand(0, 320), gx = e.home.x + Math.cos(a) * d, gy = e.home.y + Math.sin(a) * d; if (!this.inSafe(gx, gy, 60)) { B.goal = { x: gx, y: gy }; break; } } B.wait = now + rand(1500, 5000); }
       } else if (z && (hyp(e.x - z.tcx, e.y - z.tcy) > z.tr * .9 && (z.st === 'shrink' || this.zoneOut(e) || hyp(e.x - z.cx, e.y - z.cy) > z.r - 300))) {
         if (!B.goal || !B.zg) { const a = rand(0, 6.283), d = Math.random() * z.tr * .6; B.goal = { x: z.tcx + Math.cos(a) * d, y: z.tcy + Math.sin(a) * d }; B.zg = true; B.box = null; }
       } else if (!B.goal || hyp(B.goal.x - e.x, B.goal.y - e.y) < 40) {
@@ -680,6 +687,7 @@ class Room {
       }
       if (e.it.gren && d > 150 && d < 380 && Math.random() < .003) this.throwG(e, 'gren');
       if (e.act) e.act = null;
+      if (guard && this.inSafe(e.x + e.mx * 60, e.y + e.my * 60, 30)) { e.mx = 0; e.my = 0; }
     } else if (e.act && e.act.k === 'search') { e.mx = 0; e.my = 0; }
     else if (now < B.unstick) { e.mx = B.ux; e.my = B.uy; e.a = Math.atan2(e.my, e.mx); }
     else if (B.goal) { const dx = B.goal.x - e.x, dy = B.goal.y - e.y, d = hyp(dx, dy) || 1; const sl = guard && !B.tgt ? .55 : 1; e.mx = dx / d * sl; e.my = dy / d * sl; e.a = Math.atan2(dy, dx); if (guard && d < 40) { e.mx = 0; e.my = 0; } }
@@ -813,7 +821,7 @@ const WORLD = new Room({ name: '레이드 월드', world: 1 }, null);
 rooms.set(WORLD.id, WORLD); WORLD.initWorld();
 
 function send(c, m) { if (c.ws.readyState === 1) c.ws.send(m); }
-function roomList() { return [...rooms.values()].map(r => r.world ? { id: r.id, name: r.name, mode: 'ex', world: 1, n: r.members.size, st: 'world', lk: 0 } : { id: r.id, name: r.name, mode: r.mode, ts: r.ts, n: r.members.size, st: r.st, lk: r.pw ? 1 : 0 }); }
+function roomList() { return [...rooms.values()].map(r => r.world ? Object.assign({ id: r.id, name: r.name, mode: 'ex', world: 1, st: 'world', lk: 0 }, r.worldStatus()) : { id: r.id, name: r.name, mode: r.mode, ts: r.ts, n: r.members.size, st: r.st, lk: r.pw ? 1 : 0 }); }
 function joinRoom(c, r, pw) {
   if (r.world) return r.addPlayer(c);
   if (r.pw && r.host !== c.id && String(pw || '') !== r.pw) return send(c, JSON.stringify({ t: 'err', code: 'pw', id: r.id, txt: pw ? '비밀번호가 틀렸습니다' : '비밀번호가 필요한 방입니다' }));
