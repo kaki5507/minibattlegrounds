@@ -129,15 +129,47 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
 #game{display:none;position:fixed;inset:0;z-index:2;background:#000}
 #game.on{display:block}
 #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
-.hb{position:absolute;width:52px;height:52px;border-radius:50%;background:rgba(10,12,14,.55);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.05;padding:0;touch-action:none;overflow:hidden;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.hb{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(10,12,14,.58);border:1px solid rgba(255,255,255,.24);user-select:none;-webkit-user-select:none;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.05;padding:0;touch-action:none;overflow:hidden;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 .hb small{font-size:10px;opacity:.8}
 .hb .cdv{position:absolute;inset:0;background:rgba(0,0,0,.6);transform-origin:bottom}
 .hb.big{width:66px;height:66px;background:rgba(226,160,63,.85);color:#14100a;border-color:rgba(255,255,255,.5)}
 .hb.hide{display:none}
-#topbtn{position:absolute;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:6px}
+#topbtn{position:absolute;top:calc(10px + env(safe-area-inset-top));left:calc(126px + env(safe-area-inset-left));display:flex;gap:6px}
 #topbtn .hb{position:static;width:44px;height:44px}
 #hint{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.55;pointer-events:none;white-space:nowrap}
 
+/* 인게임 버튼 */
+.hb span{display:block;font-size:12px;font-weight:700;letter-spacing:-.2px;text-align:center;line-height:1.1}
+.hb span small{display:block;font-size:9px;font-weight:500;opacity:.75;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb.fire{width:78px;height:78px;background:rgba(201,74,59,.62);border:2px solid rgba(255,255,255,.45)}
+.hb.fire span{font-size:14px;letter-spacing:1px}
+.hb.fire.sm{width:62px;height:62px}
+.hb.fire.on{background:rgba(232,90,72,.9);transform:scale(.94)}
+.hb.tog.on{background:rgba(226,160,63,.85);color:#14100a;border-color:#fff}
+.hb.big{width:76px;height:76px}
+#lootp{position:absolute;left:50%;top:calc(84px + env(safe-area-inset-top));transform:translateX(-50%);width:min(340px,88vw);max-height:min(56vh,420px);overflow:auto;background:rgba(14,17,20,.94);border:1px solid var(--line2);border-radius:12px;padding:12px;display:none;z-index:6;box-shadow:0 14px 40px rgba(0,0,0,.6);touch-action:pan-y}
+#lootp.on{display:block}
+#lootp .lh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+#lootp .lh b{font-size:15px}
+#lootp .lh button{padding:6px 12px;font-size:12px}
+#lootp .ll{display:flex;flex-direction:column;gap:5px}
+.lit{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid var(--line);border-left:3px solid var(--c);border-radius:6px;background:#11151a;cursor:pointer}
+.lit:hover,.lit:active{background:#182027}
+.lit b{display:block;font-size:13px}.lit small{display:block;font-size:11px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lit span{font-size:11px;font-weight:700;color:var(--acc);white-space:nowrap}
+.lvl{display:flex;align-items:center;gap:8px;margin-top:8px}
+.lvl span{font-family:var(--fd);font-weight:700;font-size:15px;color:var(--acc);min-width:42px}
+.lvl small{font-size:10px;color:var(--tx3);white-space:nowrap}
+.xpbar{flex:1;height:5px;background:#1c2228;border-radius:3px;overflow:hidden}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,#c98a2f,#f0b95c)}
+.ri.world{border-color:#2c4a63;background:linear-gradient(90deg,#132231,#0f1215)}
+.xpbox{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:8px;background:#0f1215;text-align:left}
+.xprow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.xprow b{font-family:var(--fd);font-size:20px;color:var(--acc)}
+.xprow span{font-family:var(--fd);font-weight:700;color:var(--tx2)}
+.xprow em{font-style:normal;color:#5ee08a;margin-right:6px;letter-spacing:1px}
+.xpsub{font-size:11px;color:var(--tx3);margin-top:7px}
+.rp{color:var(--tx2);font-size:13px;margin:0 0 6px}.rp2{font-size:12px;color:var(--tx3);line-height:1.7}
 /* 모달 */
 .modal{position:fixed;inset:0;background:rgba(4,5,6,.78);display:none;align-items:center;justify-content:center;z-index:20;touch-action:pan-y;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .modal.on{display:flex}
@@ -228,7 +260,7 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
       <div class="brand">
         <div class="en">MINI BATTLEGROUNDS</div>
         <h1>미니<span>배틀그라운드</span></h1>
-        <p>마지막 한 명이 될 때까지. 줄어드는 자기장 안에서 무기를 모으고, 살아남거나 탈출하세요.</p>
+        <p>배틀로얄에서는 마지막 한 명까지 살아남고, 레이드에서는 던전을 털어 무사히 빠져나오세요. 상자는 열어 보기 전까지 무엇이 들었는지 모릅니다.</p>
       </div>
       <div class="panel">
         <div class="lbl">Operator</div>
@@ -237,6 +269,7 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
           <div class="meta">
             <input id="nm" maxlength="12" placeholder="닉네임" autocomplete="off">
             <div id="nmLocked" class="nmlock"></div>
+            <div id="lvl" class="lvl"></div>
             <button class="g" id="shopBtn" style="margin-top:8px;width:100%;padding:8px">치장 변경</button>
           </div>
         </div>
@@ -244,8 +277,8 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
         <div id="acctBar" class="acct"></div>
       </div>
       <div class="play">
-        <button class="y pbtn" id="qBR"><span class="k">QUICK · BR</span><b>빠른 배틀로얄</b><small>20인 · 자기장 생존</small></button>
-        <button class="b pbtn" id="qEX"><span class="k">QUICK · RAID</span><b>빠른 탈출</b><small>전리품 챙겨 탈출</small></button>
+        <button class="y pbtn" id="qBR"><span class="k">QUICK · BR</span><b>빠른 배틀로얄</b><small>20인 · 60초 교전 금지 후 시작</small></button>
+        <button class="b pbtn" id="qEX"><span class="k">RAID · ALWAYS ON</span><b>레이드 입장</b><small>던전 5개 · 상시 오픈</small></button>
       </div>
     </div>
 
@@ -254,16 +287,13 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
         <div class="lbl">Create Room</div>
         <div class="mk">
           <label class="field full"><span>방 이름</span><input id="rname" maxlength="20" placeholder="방 이름을 입력하세요" autocomplete="off"></label>
-          <div class="field"><span>모드</span>
-            <div class="segs"><label class="seg"><input type="radio" name="rmode" value="br" checked><span>배틀로얄</span></label><label class="seg"><input type="radio" name="rmode" value="ex"><span>탈출</span></label></div>
-          </div>
-          <div class="field"><span>팀</span>
+          <div class="field"><span>팀 (배틀로얄)</span>
             <div class="segs"><label class="seg"><input type="radio" name="rts" value="1" checked><span>솔로</span></label><label class="seg"><input type="radio" name="rts" value="2"><span>듀오</span></label><label class="seg"><input type="radio" name="rts" value="4"><span>스쿼드</span></label></div>
           </div>
           <label class="field"><span>비밀번호 <small style="color:var(--tx3)">(선택)</small></span>
             <div class="pwrap"><input id="rpw" type="password" maxlength="16" placeholder="비워두면 공개방" autocomplete="new-password"><button class="eye" type="button" data-eye="rpw">보기</button></div>
           </label>
-          <div class="field"><span>&nbsp;</span><button class="y" id="mk" style="padding:11px">방 만들기</button></div>
+          <div class="field full"><button class="y" id="mk" style="padding:12px">배틀로얄 방 만들기</button></div>
         </div>
       </div>
       <div class="panel">
@@ -271,8 +301,8 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
         <div id="roomList"></div>
       </div>
       <div class="keys">
-        <b style="color:var(--tx2)">모바일</b> 왼쪽 원 이동 · 오른쪽 원 조준 (끝까지 밀면 사격)<br>
-        <b style="color:var(--tx2)">PC</b> <kbd>WASD</kbd>이동 <kbd>클릭</kbd>사격 <kbd>R</kbd>장전 <kbd>Q</kbd>교체 <kbd>Space</kbd>숙이기 <kbd>F</kbd>상호작용 <kbd>G</kbd><kbd>V</kbd><kbd>T</kbd>투척 <kbd>H</kbd><kbd>B</kbd>치료 <kbd>Tab</kbd>가방 <kbd>M</kbd>지도
+        <b style="color:var(--tx2)">모바일</b> 왼쪽 원 이동 · 오른쪽 원 조준 · 발사 버튼(끌면 조준) · 조준 버튼으로 멀리 보기 · 구르기<br>
+        <b style="color:var(--tx2)">PC</b> <kbd>WASD</kbd>이동 <kbd>클릭</kbd>사격 <kbd>우클릭</kbd>조준 <kbd>Space</kbd>구르기 <kbd>R</kbd>장전 <kbd>Q</kbd>교체 <kbd>F</kbd>수색 <kbd>G</kbd><kbd>V</kbd><kbd>T</kbd>투척 <kbd>H</kbd><kbd>B</kbd>치료 <kbd>Tab</kbd>가방 <kbd>M</kbd>지도
       </div>
     </div>
   </div>
@@ -295,12 +325,13 @@ label.seg input:checked+span{background:#232a31;color:var(--tx);box-shadow:inset
 <div id="game">
   <canvas id="cv"></canvas>
   <div id="topbtn">
-    <div class="hb" data-a="med">💊<small>구급</small></div>
-    <div class="hb" data-a="band">🩹<small>붕대</small></div>
-    <div class="hb" data-a="fuel">⛽<small>연료</small></div>
-    <div class="hb" data-a="inv">🎒<small>가방</small></div>
-    <div class="hb" data-a="map">🗺<small>지도</small></div>
+    <div class="hb" data-a="med"><span>구급</span></div>
+    <div class="hb" data-a="band"><span>붕대</span></div>
+    <div class="hb" data-a="fuel"><span>연료</span></div>
+    <div class="hb" data-a="inv"><span>가방</span></div>
+    <div class="hb" data-a="map"><span>지도</span></div>
   </div>
+  <div id="lootp"></div>
   <div id="btnwrap"></div>
   <div id="hint"></div>
 </div>
