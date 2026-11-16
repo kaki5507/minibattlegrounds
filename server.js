@@ -3,6 +3,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const WebSocket = require('ws');
 const S = require('./shared.js');
+const ACC = require('./accounts.js');
 const PORT = process.env.PORT || 3000;
 const TICK = 1000 / 30;
 
@@ -64,12 +65,12 @@ const ZDPS = [0.6, 1.2, 2.2, 4, 7, 11, 16, 22];
 class Room {
   constructor(opts, host) {
     this.id = nextRoomId++; this.name = (opts.name || '미니 배그 방').slice(0, 20); this.mode = opts.mode === 'ex' ? 'ex' : 'br';
-    this.ts = [1, 2, 4].includes(+opts.ts) ? +opts.ts : 1; this.host = host; this.members = new Set(); this.st = 'lobby'; this.created = Date.now(); this.cd = null;
+    this.ts = [1, 2, 4].includes(+opts.ts) ? +opts.ts : 1; this.pw = String(opts.pw || '').slice(0, 16); this.host = host; this.members = new Set(); this.st = 'lobby'; this.created = Date.now(); this.cd = null;
   }
   humans() { return [...this.members].map(id => clients.get(id)).filter(Boolean); }
   info() {
     const h = this.humans();
-    return { t: 'room', id: this.id, name: this.name, mode: this.mode, ts: this.ts, host: this.host, st: this.st, cd: this.cd ? Math.max(0, this.cd - Date.now()) : null, age: Date.now() - this.created, players: h.map(c => ({ id: c.id, name: c.name, skin: c.skin })) };
+    return { t: 'room', id: this.id, name: this.name, mode: this.mode, ts: this.ts, lk: this.pw ? 1 : 0, host: this.host, st: this.st, cd: this.cd ? Math.max(0, this.cd - Date.now()) : null, age: Date.now() - this.created, players: h.map(c => ({ id: c.id, name: c.name, skin: c.skin })) };
   }
   broadcastInfo() { const m = JSON.stringify(this.info()); for (const c of this.humans()) send(c, m); }
   lobbyTick() {
@@ -94,7 +95,11 @@ class Room {
     while (list.length < total) list.push({ bot: true, name: pick(BOTNAMES) + randi(1, 99), skin: S.cleanSkin({ body: pick(Object.keys(S.BODIES).filter(b => b !== 'goldduck')), hat: pick(Object.keys(S.HATS)), col: pick(Object.keys(S.COLORS)), face: pick(Object.keys(S.FACES)), glove: pick(Object.keys(S.GLOVES)), bag: pick(Object.keys(S.BAGS)), gskin: pick(Object.keys(S.GSKINS)) }), kind: ex ? 'pmc' : 'br' });
     list.forEach((o, i) => {
       const e = this.mkEnt(o.name, o.bot, Math.floor(i / this.ts), o.skin);
-      if (o.c) { o.c.eid = e.id; e.cid = o.c.id; } else this.mkAI(e, o.kind);
+      if (o.c) {
+        o.c.eid = e.id; e.cid = o.c.id;
+        if (ex && o.c.acc) { e.acc = o.c.acc; const kit = o.c.acc.kit; o.c.acc.kit = []; ACC.persist(o.c.acc); if (kit.length) { e.w = [null, null]; e.am.light = 0; applyKit(e, kit); if (!e.w[0]) { e.w[0] = newW('pistol'); e.am.light += 12; } } e.kitVal = kit.reduce((s, it) => s + S.itemPrice(it), 0); }
+        else if (o.c.acc) e.acc = o.c.acc;
+      } else this.mkAI(e, o.kind);
     });
     if (ex) for (let i = 0; i < 18; i++) { const e = this.mkEnt('스캐브' + (i + 1), true, 9999, S.cleanSkin({ body: pick(['man', 'woman', 'dog', 'bear']), hat: pick(['cap', 'beret', 'beanie', 'none']), col: 'camo', face: pick(['mask', 'none', 'gasmask']), glove: 'tactical', bag: 'mil', gskin: 'none' })); this.mkAI(e, 'scav'); }
     this.spawnAll();
@@ -367,10 +372,23 @@ class Room {
     if (!v.bot) this.finish(v, 'dead');
   }
   finish(e, res) {
+    if (e.finished) return; e.finished = true;
     if (res === 'mia') { e.st = 'x'; }
+    let saved = null;
     if (res === 'extract') { e.st = 'e'; if (e.car) this.exitCar(e); }
+    const a = e.acc;
+    if (a) {
+      a.stats.games++; a.stats.kills += e.kills;
+      if (res === 'win') a.stats.wins++;
+      if (res === 'extract' && this.mode === 'ex') {
+        a.stats.ext++; a.stats.val += e.val; a.money += e.val;
+        saved = lootOf(e); for (const it of saved) ACC.addToStash(a, it);
+      }
+      ACC.persist(a);
+    }
     const c = clients.get(e.cid); if (!c) return;
-    send(c, JSON.stringify({ t: 'result', res, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(this.time / 1000), mode: this.mode }));
+    send(c, JSON.stringify({ t: 'result', res, place: e.place || this.aliveTeams().size + 1, kills: e.kills, val: e.val, vals: e.vals || 0, time: Math.round(this.time / 1000), mode: this.mode, saved: saved ? saved.map(it => S.itemName(it) + (it.n > 1 && it.k !== 'ar' ? ' ×' + it.n : '')) : null, lost: this.mode === 'ex' && res !== 'extract' ? Math.round(e.kitVal || 0) : 0, acct: !!a }));
+    if (a && c.acc === a) sendAcc(c);
   }
   aliveTeams() { const s = new Set(); for (const e of this.ents) if (this.alive(e) && e.team !== 9999) s.add(e.team); return s; }
   checkEnd(now) {
@@ -647,8 +665,9 @@ class Room {
 }
 
 function send(c, m) { if (c.ws.readyState === 1) c.ws.send(m); }
-function roomList() { return [...rooms.values()].map(r => ({ id: r.id, name: r.name, mode: r.mode, ts: r.ts, n: r.members.size, st: r.st })); }
-function joinRoom(c, r) {
+function roomList() { return [...rooms.values()].map(r => ({ id: r.id, name: r.name, mode: r.mode, ts: r.ts, n: r.members.size, st: r.st, lk: r.pw ? 1 : 0 })); }
+function joinRoom(c, r, pw) {
+  if (r.pw && r.host !== c.id && String(pw || '') !== r.pw) return send(c, JSON.stringify({ t: 'err', code: 'pw', id: r.id, txt: pw ? '비밀번호가 틀렸습니다' : '비밀번호가 필요한 방입니다' }));
   if (c.room) leaveRoom(c);
   if (r.members.size >= S.MAXP) return send(c, JSON.stringify({ t: 'err', txt: '방이 가득 찼습니다 (최대 10명)' }));
   if (r.st !== 'lobby') return send(c, JSON.stringify({ t: 'err', txt: '이미 게임이 진행 중인 방입니다' }));
@@ -656,9 +675,36 @@ function joinRoom(c, r) {
 }
 function leaveRoom(c) { const r = rooms.get(c.room); if (r) r.leave(c); c.room = null; send(c, JSON.stringify({ t: 'left' })); }
 
+function sendAcc(c, token) { if (c.acc) send(c, JSON.stringify({ t: 'acct', acc: ACC.view(c.acc), token: token || undefined })); }
+function setAcc(c, a, token) {
+  for (const o of clients.values()) if (o !== c && o.acc === a) { o.acc = null; o.name = '손님' + randi(100, 999); send(o, JSON.stringify({ t: 'logout', txt: '다른 곳에서 로그인되어 로그아웃되었습니다' })); }
+  c.acc = a; c.name = a.name; c.skin = S.cleanSkin(a.skin); sendAcc(c, token);
+}
+// 레이드 아이템 <-> 창고 아이템 변환
+const wSer = w => ({ id: w.id, att: Object.assign({}, w.att), base: w.base || undefined });
+function applyKit(e, kit) {
+  let gotW = false;
+  for (const it of kit) {
+    if (it.k === 'w' && it.w) { const w = newW(it.w.id, it.w.base || null); w.att = Object.assign({}, it.w.att || {}); restat(w); w.mag = 0; const i = gotW ? 1 : 0; e.w[i] = w; gotW = true; }
+    else if (it.k === 'ar') { e.arL = it.d; e.arD = it.n; }
+    else if (it.k === 'am') e.am[it.d] = (e.am[it.d] || 0) + it.n;
+    else if (it.k === 'att') e.bag.push(it.d);
+    else if (S.ITEMN[it.k]) e.it[it.k] = (e.it[it.k] || 0) + it.n;
+  }
+  if (gotW) { if (e.w[0] && e.w[0].id === 'pistol' && !kit.some(x => x.k === 'w' && x.w.id === 'pistol')) {} e.cw = 0; for (const w of e.w) if (w) { const take = Math.min(w.st.mag, e.am[w.st.am] || 0); w.mag = take; e.am[w.st.am] -= take; } }
+}
+function lootOf(e) {
+  const out = [];
+  for (const w of e.w) if (w) { e.am[w.st.am] = (e.am[w.st.am] || 0) + w.mag; out.push({ k: 'w', w: wSer(w) }); }
+  if (e.arL && e.arD > 5) out.push({ k: 'ar', d: e.arL, n: Math.round(e.arD) });
+  for (const k in e.am) if (e.am[k] > 0) out.push({ k: 'am', d: k, n: e.am[k] });
+  for (const k in e.it) if (e.it[k] > 0) out.push({ k, n: e.it[k] });
+  for (const a of e.bag) out.push({ k: 'att', d: a });
+  return out;
+}
 let nextCid = 1;
 wss.on('connection', ws => {
-  const c = { id: nextCid++, ws, name: '오리' + randi(100, 999), skin: S.cleanSkin({}), room: null, eid: null };
+  const c = { id: nextCid++, ws, name: '손님' + randi(100, 999), skin: S.cleanSkin({}), room: null, eid: null, acc: null, fails: 0, lockUntil: 0 };
   clients.set(c.id, c);
   send(c, JSON.stringify({ t: 'hi', id: c.id, rooms: roomList() }));
   ws.on('message', raw => {
@@ -667,11 +713,38 @@ wss.on('connection', ws => {
     const r = c.room && rooms.get(c.room);
     if ((m.t === 'i' || m.t === 'act') && r) return r.input(c, m);
     switch (m.t) {
-      case 'hello': c.name = String(m.name || c.name).slice(0, 12) || c.name; if (m.skin && typeof m.skin === 'object') c.skin = S.cleanSkin(m.skin); break;
+      case 'hello': {
+        if (m.skin && typeof m.skin === 'object') { c.skin = S.cleanSkin(m.skin); if (c.acc) { c.acc.skin = c.skin; ACC.persist(c.acc); } }
+        if (c.acc) { c.name = c.acc.name; break; }
+        const want = ACC.validName(m.name) || c.name;
+        if (ACC.isTaken(want)) { if (c.name === want || ACC.isTaken(c.name)) c.name = '손님' + randi(100, 999); send(c, JSON.stringify({ t: 'nametaken', name: c.name, txt: `'${want}'은(는) 등록된 계정입니다. 로그인하면 사용할 수 있어요` })); }
+        else c.name = want;
+        break;
+      }
+      case 'register': case 'login': {
+        if (Date.now() < c.lockUntil) { send(c, JSON.stringify({ t: 'autherr', txt: '시도가 너무 많습니다. 잠시 후 다시 시도하세요' })); break; }
+        const r = m.t === 'register' ? ACC.register(m.name, m.pw) : ACC.login(m.name, m.pw);
+        if (r.err) { if (m.t === 'login' && ++c.fails >= 5) { c.lockUntil = Date.now() + 30000; c.fails = 0; } send(c, JSON.stringify({ t: 'autherr', txt: r.err })); break; }
+        c.fails = 0; setAcc(c, r.acc, r.token); break;
+      }
+      case 'auth': { const a = ACC.byToken(m.token); if (a) setAcc(c, a, null); else send(c, JSON.stringify({ t: 'logout' })); break; }
+      case 'logout': ACC.logout(c.acc, m.token); c.acc = null; c.name = '손님' + randi(100, 999); send(c, JSON.stringify({ t: 'logout' })); break;
+      case 'stash': {
+        if (!c.acc) break;
+        const inRaid = r && r.st === 'play';
+        if (inRaid) { send(c, JSON.stringify({ t: 'err', txt: '게임 중에는 창고를 정리할 수 없습니다' })); break; }
+        let err = null;
+        if (m.op === 'kit') err = ACC.moveToKit(c.acc, +m.i);
+        else if (m.op === 'unkit') err = ACC.moveToStash(c.acc, +m.i);
+        else if (m.op === 'sell') err = ACC.sell(c.acc, +m.i, m.from);
+        else if (m.op === 'buy') err = ACC.buy(c.acc, String(m.id));
+        if (err) send(c, JSON.stringify({ t: 'err', txt: err }));
+        sendAcc(c); break;
+      }
       case 'list': send(c, JSON.stringify({ t: 'rooms', rooms: roomList() })); break;
-      case 'create': { const nr = new Room(m, c.id); rooms.set(nr.id, nr); joinRoom(c, nr); break; }
-      case 'join': { const jr = rooms.get(+m.id); if (jr) joinRoom(c, jr); else send(c, JSON.stringify({ t: 'err', txt: '방을 찾을 수 없습니다' })); break; }
-      case 'quick': { const mode = m.mode === 'ex' ? 'ex' : 'br'; let q = [...rooms.values()].find(x => x.mode === mode && x.st === 'lobby' && x.members.size < S.MAXP); if (!q) { q = new Room({ name: (mode === 'ex' ? '탈출 ' : '배그 ') + '빠른방', mode, ts: 1 }, c.id); rooms.set(q.id, q); } joinRoom(c, q); break; }
+      case 'create': { if (m.pw && String(m.pw).length < 2) { send(c, JSON.stringify({ t: 'err', txt: '방 비밀번호는 2자 이상으로 입력하세요' })); break; } const nr = new Room(m, c.id); rooms.set(nr.id, nr); joinRoom(c, nr); break; }
+      case 'join': { const jr = rooms.get(+m.id); if (jr) joinRoom(c, jr, m.pw); else send(c, JSON.stringify({ t: 'err', txt: '방을 찾을 수 없습니다' })); break; }
+      case 'quick': { const mode = m.mode === 'ex' ? 'ex' : 'br'; let q = [...rooms.values()].find(x => x.mode === mode && x.st === 'lobby' && !x.pw && x.members.size < S.MAXP); if (!q) { q = new Room({ name: (mode === 'ex' ? '탈출 ' : '배그 ') + '빠른방', mode, ts: 1 }, c.id); rooms.set(q.id, q); } joinRoom(c, q); break; }
       case 'leave': leaveRoom(c); break;
       case 'start': if (r && r.host === c.id && r.st === 'lobby') { if (r.members.size >= S.MINP || Date.now() - r.created > 8000) r.begin(); else send(c, JSON.stringify({ t: 'err', txt: '방 생성 8초 후부터 봇과 시작할 수 있습니다' })); } break;
       case 'chat': if (r) { const txt = String(m.txt || '').slice(0, 60); if (txt) for (const h of r.humans()) send(h, JSON.stringify({ t: 'chat', name: c.name, txt })); } break;
@@ -696,4 +769,6 @@ setInterval(() => {
   for (const c of clients.values()) if (!c.room) send(c, list);
 }, 1000);
 
-server.listen(PORT, () => console.log('미니 배그 서버 실행중: http://localhost:' + PORT));
+ACC.init().catch(err => console.error('[계정] 초기화 실패', err)).finally(() => server.listen(PORT, () => console.log('미니 배그 서버 실행중: http://localhost:' + PORT)));
+
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { await ACC.flush(); } catch (e) {} process.exit(0); });

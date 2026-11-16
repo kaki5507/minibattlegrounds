@@ -126,6 +126,37 @@ S.COLORS = {
   pink: { n: '핑크', c: '#ec407a', req: { w: 2 } }, camo: { n: '사막', c: '#c8a165', req: { x: 1 } }, mint: { n: '민트', c: '#4db6ac', req: { k: 12 } },
   purple: { n: '보라', c: '#8e24aa', req: { w: 3 } }, white: { n: '설원', c: '#eceff1', req: { x: 3 } }, gold: { n: '골드', c: '#ffb300', req: { w: 7 } },
 };
+// ───────── 경제 (타르코프식 창고/상인) ─────────
+S.PRICE = { w: { pistol: 300, smg: 900, ar: 1800, dmr: 2400, sg: 1200, sniper: 3600, lmg: 3000, hyb: 3200 }, ar: [0, 600, 1500, 3200], am: { light: 4, rifle: 8, shell: 10, sniper: 30 },
+  it: { med: 400, band: 80, gren: 350, flash: 250, smoke: 200, fuel: 150 }, att: 450 };
+S.itemPrice = function (it) {
+  if (!it) return 0;
+  if (it.k === 'w') { const w = it.w || {}; return (S.PRICE.w[w.id] || 1000) + Object.keys(w.att || {}).length * S.PRICE.att; }
+  if (it.k === 'ar') { const full = S.ARMOR[it.d] ? S.ARMOR[it.d].dur : 1; return Math.round(S.PRICE.ar[it.d] * (.4 + .6 * Math.min(1, (it.n || 0) / full))); }
+  if (it.k === 'am') return (S.PRICE.am[it.d] || 5) * (it.n || 0);
+  if (it.k === 'att') return S.PRICE.att;
+  if (it.k === 'val') return (it.n || 0) * 2;
+  return (S.PRICE.it[it.k] || 50) * (it.n || 1);
+};
+S.itemName = function (it) {
+  if (it.k === 'w') { const w = it.w || {}; return (w.base && w.base.n) || (S.WEAPONS[w.id] ? S.WEAPONS[w.id].n : '무기'); }
+  if (it.k === 'ar') return S.ARMOR[it.d] ? S.ARMOR[it.d].n : '방어구';
+  if (it.k === 'am') return S.AMMO[it.d] || '탄약';
+  if (it.k === 'att') return S.ATT[it.d] ? S.ATT[it.d].n : '부착물';
+  if (it.k === 'val') return S.VALUABLES[it.d] ? S.VALUABLES[it.d][0] : '귀중품';
+  return S.ITEMN[it.k] || it.k;
+};
+S.SHOP = [];
+(function () {
+  const add = (id, cat, item, mul) => S.SHOP.push({ id, cat, item, price: Math.round(S.itemPrice(item) * (mul || 1.2)) });
+  for (const w of ['pistol', 'smg', 'sg', 'ar', 'dmr', 'lmg', 'sniper']) add('w_' + w, '무기', { k: 'w', w: { id: w, att: {} } });
+  for (const l of [1, 2, 3]) add('ar_' + l, '방어구', { k: 'ar', d: l, n: S.ARMOR[l].dur });
+  add('am_light', '탄약', { k: 'am', d: 'light', n: 60 }); add('am_rifle', '탄약', { k: 'am', d: 'rifle', n: 60 });
+  add('am_shell', '탄약', { k: 'am', d: 'shell', n: 20 }); add('am_sniper', '탄약', { k: 'am', d: 'sniper', n: 10 });
+  for (const k of ['med', 'band', 'gren', 'flash', 'smoke']) add('it_' + k, '소모품', { k, n: k === 'band' ? 3 : 1 });
+  for (const a in S.ATT) add('att_' + a, '부착물', { k: 'att', d: a });
+})();
+
 S.SKINSLOTS = { body: S.BODIES, hat: S.HATS, face: S.FACES, glove: S.GLOVES, bag: S.BAGS, gskin: S.GSKINS, col: S.COLORS };
 S.cleanSkin = function (k) {
   const o = {}; k = k || {};
